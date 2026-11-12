@@ -28,3 +28,11 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules
+
+- Game rules (Code parser, Code Game parser, play sim) live in `src/game/sim/` as plain TypeScript with no React/three imports, so they stay unit-testable (`src/game/sim/rules.test.ts`).
+- Per-frame play state lives in `src/game/runtime.ts` (outside React); the zustand store only holds edit data, selection and HUD values. Stop restores the pre-Play scene because play never writes to the store's objects.
+- Scene objects are keyed by `session` in `World.tsx`, so Play/Stop remount them and reset any runtime-driven transforms.
+- The studio route uses `ssr: false`; projects persist only in browser localStorage (`src/game/storage.ts`).
+- Dev builds expose `window.__studio` (the zustand store) for scripted browser checks.
