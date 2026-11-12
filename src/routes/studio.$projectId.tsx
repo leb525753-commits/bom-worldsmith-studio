@@ -1,3 +1,4 @@
+import { autoLockOnFirstTap } from "@/game/orientation";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Canvas } from "@react-three/fiber";
 import { Home } from "lucide-react";
@@ -65,6 +66,7 @@ function Studio() {
   const [dialog, setDialog] = useState<"code" | "game" | null>(null);
   const [ready, setReady] = useState(false);
   useKeyboard();
+  useEffect(() => autoLockOnFirstTap(), []);
 
   useEffect(() => {
     load(projectId);

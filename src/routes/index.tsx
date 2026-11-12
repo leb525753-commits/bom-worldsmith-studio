@@ -1,3 +1,4 @@
+import { autoLockOnFirstTap } from "@/game/orientation";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Clock, FolderOpen, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -28,6 +29,7 @@ function Home() {
   useEffect(() => {
     setProjects(listProjects());
   }, []);
+  useEffect(() => autoLockOnFirstTap(), []);
 
   const open = (id: string) => navigate({ to: "/studio/$projectId", params: { projectId: id } });
 

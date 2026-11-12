@@ -4,6 +4,7 @@ import { StudioButton } from "@/components/studio/StudioButton";
 import { input, runtime } from "../runtime";
 import { dropSword, swing } from "../sim/play";
 import { useStudio } from "../store";
+import { lockLandscape } from "../orientation";
 
 type NavKey = keyof typeof input.nav;
 
@@ -155,6 +156,7 @@ export function PlayHud() {
 
 export function RotateHint() {
   const [dismissed, setDismissed] = useState(false);
+  const [failed, setFailed] = useState(false);
   if (dismissed) return null;
   return (
     <div className="rotate-hint fixed inset-0 z-[60] flex-col items-center justify-center gap-5 bg-background p-8 text-center">
@@ -163,6 +165,16 @@ export function RotateHint() {
         <p className="text-lg font-bold">Xoay ngang thiết bị</p>
         <p className="mt-1 text-sm text-muted-foreground">Bờm Studio được thiết kế cho màn hình ngang.</p>
       </div>
+      <StudioButton
+        variant="primary"
+        size="lg"
+        onClick={async () => {
+          if (!(await lockLandscape())) setFailed(true);
+        }}
+      >
+        Xoay ngang tự động
+      </StudioButton>
+      {failed && <p className="max-w-xs text-xs text-muted-foreground">Trình duyệt này không cho tự xoay. Hãy bật xoay màn hình và xoay ngang điện thoại.</p>}
       <StudioButton variant="ghost" onClick={() => setDismissed(true)}>
         Vẫn tiếp tục ở màn hình dọc
       </StudioButton>
