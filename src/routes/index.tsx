@@ -1,9 +1,10 @@
 import { autoLockOnFirstTap } from "@/game/orientation";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Clock, FolderOpen, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Clock, FolderOpen, LogIn, LogOut, Plus, Trash2, UserRound } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
 import { StudioButton } from "@/components/studio/StudioButton";
 import splash from "@/assets/splash-world.jpg";
+import { currentAccount, login, logout } from "@/game/accounts";
 import { newId } from "@/game/catalog";
 import { deleteProject, listProjects } from "@/game/storage";
 import type { Project } from "@/game/types";
@@ -25,10 +26,31 @@ export const Route = createFileRoute("/")({
 function Home() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[] | null>(null);
+  const [account, setAccount] = useState<{ name: string } | null | undefined>(undefined);
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState("");
+  const [pass, setPass] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    setAccount(currentAccount());
     setProjects(listProjects());
   }, []);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    const r = await login(name, pass);
+    setBusy(false);
+    if (!r.ok) return setError(r.error);
+    setError("");
+    setPass("");
+    setAccount({ name: r.name });
+    setProjects(listProjects());
+  };
+  const field =
+    "h-11 w-full rounded-lg border border-border bg-input px-3 text-sm outline-none focus:border-primary";
   useEffect(() => autoLockOnFirstTap(), []);
 
   const open = (id: string) => navigate({ to: "/studio/$projectId", params: { projectId: id } });
@@ -49,6 +71,39 @@ function Home() {
           </span>
         </h1>
 
+        {account === null && !showForm && (
+          <StudioButton variant="primary" size="xl" className="animate-float-in [animation-delay:120ms]" onClick={() => setShowForm(true)}>
+            <LogIn className="h-5 w-5" /> Đăng nhập
+          </StudioButton>
+        )}
+        {account === null && showForm && (
+          <form onSubmit={submit} className="grid w-full max-w-xs gap-2 rounded-xl border border-border bg-overlay p-4 backdrop-blur-md animate-float-in">
+            <input className={field} placeholder="Tên" aria-label="Tên" autoComplete="username" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            <input className={field} placeholder="Mật khẩu" aria-label="Mật khẩu" type="password" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} />
+            <StudioButton type="submit" variant="primary" size="lg" disabled={busy}>
+              <LogIn className="h-4 w-4" /> Đăng nhập
+            </StudioButton>
+            {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+            <p className="text-[11px] text-muted-foreground">Tên mới sẽ tự tạo tài khoản. Tên cũ cần đúng mật khẩu.</p>
+          </form>
+        )}
+        {account && (
+        <>
+        <div className="flex items-center gap-2 rounded-full border border-border bg-overlay px-3 py-1 text-sm backdrop-blur-md">
+          <UserRound className="h-4 w-4 text-primary" /> {account.name}
+          <button
+            type="button"
+            className="ml-1 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={() => {
+              logout();
+              setAccount(null);
+              setShowForm(true);
+              setProjects([]);
+            }}
+          >
+            <LogOut className="h-3.5 w-3.5" /> Đăng xuất
+          </button>
+        </div>
         <StudioButton variant="primary" size="xl" className="animate-float-in [animation-delay:120ms]" onClick={() => open(newId())}>
           <Plus className="h-5 w-5" /> Tạo dự án
         </StudioButton>
@@ -93,6 +148,8 @@ function Home() {
             </ul>
           )}
         </section>
+        </>
+        )}
       </div>
     </div>
   );

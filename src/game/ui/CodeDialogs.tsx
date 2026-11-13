@@ -70,9 +70,12 @@ export function CodeGameDialog({ onClose }: { onClose: () => void }) {
       if (c.type === "npc") {
         created.push(makeObject("npc", spawnPoint(5), { npcType: c.npcType, hp: c.hp, damage: c.damage }));
         ok.push(c.npcType === "monster" ? `Quái vật · ${c.hp} máu · ${c.damage} dame` : `Dân thường · ${c.hp} máu`);
+      } else if (c.type === "block") {
+        created.push(makeObject("block", spawnPoint(6), { color: c.color, effect: c.effect, effectValue: c.value }));
+        ok.push(`Block ${c.colorName}${c.effect === "vanish" ? " · chạm biến mất" : c.effect === "hurt" ? ` · chạm mất ${c.value} máu` : ""}`);
       } else {
         created.push(makeObject(c.kind, spawnPoint(c.kind === "road" ? 2 : 6)));
-        ok.push({ house: "Nhà", tree: "Cây táo", road: "Đường", bush: "Bụi cây", sword: "Kiếm", part: "Part" }[c.kind]);
+        ok.push({ house: "Nhà", house2: "Nhà 2 tầng", potion: "Bình thuốc", tree: "Cây táo", road: "Đường", bush: "Bụi cây", sword: "Kiếm", part: "Part" }[c.kind]);
       }
     }
     if (created.length) spawnMany(created);
@@ -113,7 +116,13 @@ export function CodeGameDialog({ onClose }: { onClose: () => void }) {
 +5 dame
 
 -tạo nhà / cây táo
--tạo đường / bụi cây`}</pre>
+-tạo đường / bụi cây
+
+-tạo block-màu đỏ
+(trắng, đỏ, xanh lá,
+ xanh biển, đen)
++thêm chức năng=chạm biến mất
++thêm chức năng=chạm mất 10 máu`}</pre>
           </div>
           {log && (
             <div className="space-y-1">

@@ -1,7 +1,8 @@
-import type { Project } from "../types";
+import type { BlockEffect, Project } from "../types";
 
 export const TUNING = {
   PLAYER_SPEED: 6,
+  POTION_SPEED_BONUS: 5,
   CIVILIAN_SPEED: 1.8,
   MONSTER_SPEED: 3.4,
   MONSTER_AGGRO: 20,
@@ -15,6 +16,11 @@ export const TUNING = {
   WANDER_RADIUS: 12,
   ACTOR_RADIUS: 0.5,
   TURN: 12,
+  JUMP_SPEED: 9,
+  GRAVITY: 26,
+  STEP_UP: 0.3,
+  VANISH_DELAY: 3,
+  HURT_COOLDOWN: 1,
 };
 
 export type Role = "player" | "civilian" | "monster";
@@ -23,7 +29,10 @@ export interface Actor {
   id: string;
   role: Role;
   x: number;
+  y: number;
   z: number;
+  vy: number;
+  grounded: boolean;
   yaw: number;
   hp: number;
   maxHp: number;
@@ -40,12 +49,17 @@ export interface Actor {
   hitT: number;
 }
 
-export interface SwordState {
+export type ItemKind = "sword" | "potion";
+
+export interface ItemState {
   id: string;
+  kind: ItemKind;
   x: number;
   z: number;
   damage: number;
   held: boolean;
+  /** Potion already drunk. */
+  used: boolean;
 }
 
 export interface Box {
@@ -53,13 +67,27 @@ export interface Box {
   maxX: number;
   minZ: number;
   maxZ: number;
+  base: number;
+  top: number;
+}
+
+export interface BlockState {
+  id: string;
+  box: Box;
+  effect: BlockEffect | undefined;
+  value: number;
+  /** Seconds left before a touched vanish-block disappears; -1 = not touched yet. */
+  timer: number;
+  gone: boolean;
+  hurtCd: number;
 }
 
 export interface PlayState {
   player: Actor;
   npcs: Actor[];
-  swords: SwordState[];
-  heldSwordId: string | null;
+  items: ItemState[];
+  blocks: BlockState[];
+  heldId: string | null;
   pickupLock: string | null;
   swingT: number;
   swingCd: number;
@@ -69,7 +97,7 @@ export interface PlayState {
 
 function actor(id: string, role: Role, x: number, z: number, hp: number, damage: number, speed: number): Actor {
   return {
-    id, role, x, z, yaw: 0, hp, maxHp: hp, damage, alive: hp > 0, speed, moving: false,
+    id, role, x, y: 0, z, vy: 0, grounded: true, yaw: 0, hp, maxHp: hp, damage, alive: hp > 0, speed, moving: false,
     homeX: x, homeZ: z, targetX: x, targetZ: z, wait: 0.5, attackCd: 0, hitT: 0,
   };
 }
@@ -77,31 +105,39 @@ function actor(id: string, role: Role, x: number, z: number, hp: number, damage:
 export function createPlayState(project: Project): PlayState {
   const [px, , pz] = project.player.position;
   const npcs: Actor[] = [];
-  const swords: SwordState[] = [];
+  const items: ItemState[] = [];
+  const blocks: BlockState[] = [];
   const obstacles: Box[] = [];
   for (const o of project.objects) {
-    const [x, , z] = o.position;
+    const [x, y, z] = o.position;
     const [sx, sy, sz] = o.scale;
     if (o.kind === "npc") {
       const monster = o.npcType === "monster";
       npcs.push(actor(o.id, monster ? "monster" : "civilian", x, z, o.hp ?? 100, o.damage ?? 0,
         monster ? TUNING.MONSTER_SPEED : TUNING.CIVILIAN_SPEED));
-    } else if (o.kind === "sword") {
-      swords.push({ id: o.id, x, z, damage: o.damage ?? 10, held: false });
-    } else if (o.kind === "house") {
-      obstacles.push({ minX: x - 2 * sx, maxX: x + 2 * sx, minZ: z - 2 * sz, maxZ: z + 2 * sz });
-    } else if (o.kind === "part" && sy * 1 + o.position[1] > 0.6 && o.position[1] < 2) {
-      obstacles.push({ minX: x - sx, maxX: x + sx, minZ: z - sz, maxZ: z + sz });
+    } else if (o.kind === "sword" || o.kind === "potion") {
+      items.push({ id: o.id, kind: o.kind, x, z, damage: o.kind === "sword" ? (o.damage ?? 10) : 0, held: false, used: false });
+    } else if (o.kind === "house" || o.kind === "house2") {
+      obstacles.push({ minX: x - 2 * sx, maxX: x + 2 * sx, minZ: z - 2 * sz, maxZ: z + 2 * sz, base: -99, top: 99 });
+    } else if (o.kind === "part") {
+      obstacles.push({ minX: x - sx, maxX: x + sx, minZ: z - sz, maxZ: z + sz, base: y, top: y + sy });
+    } else if (o.kind === "block") {
+      blocks.push({
+        id: o.id,
+        box: { minX: x - sx, maxX: x + sx, minZ: z - sz, maxZ: z + sz, base: y, top: y + sy },
+        effect: o.effect, value: o.effectValue ?? 10, timer: -1, gone: false, hurtCd: 0,
+      });
     }
   }
   return {
     player: actor("player", "player", px, pz, project.player.hp, 0, TUNING.PLAYER_SPEED),
-    npcs, swords, obstacles,
-    heldSwordId: null, pickupLock: null, swingT: 0, swingCd: 0, time: 0,
+    npcs, items, blocks, obstacles,
+    heldId: null, pickupLock: null, swingT: 0, swingCd: 0, time: 0,
   };
 }
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+const ACTOR_H = 1.8;
 
 function turnToward(a: Actor, dx: number, dz: number, dt: number) {
   const want = Math.atan2(dx, dz);
@@ -110,9 +146,17 @@ function turnToward(a: Actor, dx: number, dz: number, dt: number) {
   a.yaw += d * Math.min(1, TUNING.TURN * dt);
 }
 
+function solids(s: PlayState): Box[] {
+  const out = s.obstacles.slice();
+  for (const b of s.blocks) if (!b.gone) out.push(b.box);
+  return out;
+}
+
 function pushOut(a: Actor, boxes: Box[]) {
   const r = TUNING.ACTOR_RADIUS;
   for (const b of boxes) {
+    // Standing on top of (or passing over / under) a box never pushes sideways.
+    if (a.y >= b.top - 0.05 || a.y + ACTOR_H <= b.base) continue;
     const cx = clamp(a.x, b.minX, b.maxX);
     const cz = clamp(a.z, b.minZ, b.maxZ);
     const dx = a.x - cx;
@@ -134,6 +178,22 @@ function pushOut(a: Actor, boxes: Box[]) {
   }
   a.x = clamp(a.x, -TUNING.WORLD_HALF, TUNING.WORLD_HALF);
   a.z = clamp(a.z, -TUNING.WORLD_HALF, TUNING.WORLD_HALF);
+}
+
+const over = (a: Actor, b: Box, pad = 0) =>
+  a.x > b.minX - pad && a.x < b.maxX + pad && a.z > b.minZ - pad && a.z < b.maxZ + pad;
+
+/** Gravity + landing on the ground or the top of any box under the player. */
+function vertical(a: Actor, boxes: Box[], dt: number) {
+  let ground = 0;
+  for (const b of boxes) if (b.top < 50 && over(a, b, 0.15) && a.y >= b.top - TUNING.STEP_UP) ground = Math.max(ground, b.top);
+  a.vy -= TUNING.GRAVITY * dt;
+  a.y += a.vy * dt;
+  if (a.y <= ground) {
+    a.y = ground;
+    a.vy = 0;
+    a.grounded = true;
+  } else a.grounded = false;
 }
 
 function moveToward(a: Actor, tx: number, tz: number, dt: number): number {
@@ -164,6 +224,15 @@ function wander(a: Actor, dt: number, rand: () => number) {
   }
 }
 
+/** Jumps if the player is standing on something. */
+export function jump(s: PlayState): boolean {
+  const p = s.player;
+  if (!p.alive || !p.grounded) return false;
+  p.vy = TUNING.JUMP_SPEED;
+  p.grounded = false;
+  return true;
+}
+
 /** Advances the play simulation. `move` is a world-space XZ vector with length <= 1. */
 export function stepPlay(s: PlayState, move: { x: number; z: number }, dt: number, rand: () => number = Math.random) {
   s.time += dt;
@@ -172,6 +241,7 @@ export function stepPlay(s: PlayState, move: { x: number; z: number }, dt: numbe
   const p = s.player;
   p.hitT = Math.max(0, p.hitT - dt);
   p.moving = false;
+  const boxes = solids(s);
 
   if (p.alive) {
     const len = Math.hypot(move.x, move.z);
@@ -182,24 +252,43 @@ export function stepPlay(s: PlayState, move: { x: number; z: number }, dt: numbe
       turnToward(p, move.x, move.z, dt);
       p.moving = true;
     }
-    pushOut(p, s.obstacles);
+    pushOut(p, boxes);
+    vertical(p, boxes, dt);
   }
 
-  // Sword pickup / carry
+  // Touch blocks
+  for (const b of s.blocks) {
+    b.hurtCd = Math.max(0, b.hurtCd - dt);
+    if (b.gone) continue;
+    if (b.timer >= 0) {
+      b.timer -= dt;
+      if (b.timer <= 0) b.gone = true;
+    }
+    if (!p.alive || !b.effect) continue;
+    const touching = over(p, b.box, TUNING.ACTOR_RADIUS + 0.1) && p.y <= b.box.top + 0.1 && p.y + ACTOR_H >= b.box.base;
+    if (!touching) continue;
+    if (b.effect === "vanish" && b.timer < 0) b.timer = TUNING.VANISH_DELAY;
+    if (b.effect === "hurt" && b.hurtCd <= 0) {
+      b.hurtCd = TUNING.HURT_COOLDOWN;
+      damageActor(p, b.value);
+    }
+  }
+
+  // Item pickup / carry
   if (s.pickupLock) {
-    const locked = s.swords.find((w) => w.id === s.pickupLock);
+    const locked = s.items.find((w) => w.id === s.pickupLock);
     if (!locked || Math.hypot(locked.x - p.x, locked.z - p.z) > TUNING.PICKUP_RADIUS + 0.3) s.pickupLock = null;
   }
-  if (!s.heldSwordId && p.alive) {
-    const w = s.swords.find(
-      (w) => !w.held && w.id !== s.pickupLock && Math.hypot(w.x - p.x, w.z - p.z) < TUNING.PICKUP_RADIUS,
+  if (!s.heldId && p.alive) {
+    const w = s.items.find(
+      (w) => !w.held && !w.used && w.id !== s.pickupLock && Math.hypot(w.x - p.x, w.z - p.z) < TUNING.PICKUP_RADIUS,
     );
     if (w) {
       w.held = true;
-      s.heldSwordId = w.id;
+      s.heldId = w.id;
     }
   }
-  const held = s.swords.find((w) => w.id === s.heldSwordId);
+  const held = heldItem(s);
   if (held) {
     held.x = p.x;
     held.z = p.z;
@@ -216,17 +305,17 @@ export function stepPlay(s: PlayState, move: { x: number; z: number }, dt: numbe
         if (d > TUNING.MONSTER_REACH) moveToward(n, p.x, p.z, dt);
         else {
           turnToward(n, p.x - n.x, p.z - n.z, dt);
-          if (n.attackCd <= 0) {
+          if (n.attackCd <= 0 && p.y < 1.5) {
             n.attackCd = TUNING.MONSTER_COOLDOWN;
             damageActor(p, n.damage);
           }
         }
-        pushOut(n, s.obstacles);
+        pushOut(n, boxes);
         continue;
       }
     }
     wander(n, dt, rand);
-    pushOut(n, s.obstacles);
+    pushOut(n, boxes);
   }
 }
 
@@ -237,8 +326,13 @@ function damageActor(a: Actor, amount: number) {
   if (a.hp <= 0) a.alive = false;
 }
 
-export function heldSword(s: PlayState): SwordState | undefined {
-  return s.swords.find((w) => w.id === s.heldSwordId);
+export function heldItem(s: PlayState): ItemState | undefined {
+  return s.items.find((w) => w.id === s.heldId);
+}
+
+export function heldSword(s: PlayState): ItemState | undefined {
+  const w = heldItem(s);
+  return w?.kind === "sword" ? w : undefined;
 }
 
 /** Swings the held sword; damages every living NPC within reach. Returns hit ids. */
@@ -258,14 +352,26 @@ export function swing(s: PlayState): string[] {
   return hits;
 }
 
-/** Drops the held sword at the player's feet. */
-export function dropSword(s: PlayState): boolean {
-  const w = heldSword(s);
+/** Drops the held item at the player's feet. */
+export function dropItem(s: PlayState): boolean {
+  const w = heldItem(s);
   if (!w) return false;
   w.held = false;
   w.x = s.player.x;
   w.z = s.player.z;
-  s.heldSwordId = null;
+  s.heldId = null;
   s.pickupLock = w.id;
+  return true;
+}
+export const dropSword = dropItem;
+
+/** Drinks the held potion: +5 run speed, potion is used up. */
+export function drinkPotion(s: PlayState): boolean {
+  const w = heldItem(s);
+  if (!w || w.kind !== "potion" || !s.player.alive) return false;
+  w.held = false;
+  w.used = true;
+  s.heldId = null;
+  s.player.speed += TUNING.POTION_SPEED_BONUS;
   return true;
 }

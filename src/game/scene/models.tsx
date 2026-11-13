@@ -326,3 +326,73 @@ export function Baseplate() {
     </mesh>
   );
 }
+
+/* ------------------------------ New models ------------------------------ */
+
+const GLASS = { color: "#9fd6ff", emissive: "#3a6f99", emissiveIntensity: 0.25, roughness: 0.2 } as const;
+
+export function House2Model({ color }: { color: string }) {
+  return (
+    <group>
+      <mesh castShadow receiveShadow position={[0, 2.6, 0]}>
+        <boxGeometry args={[4, 5.2, 4]} />
+        <meshStandardMaterial color={color} roughness={0.85} />
+      </mesh>
+      <mesh castShadow position={[0, 2.65, 0]}>
+        <boxGeometry args={[4.12, 0.18, 4.12]} />
+        <meshStandardMaterial color="#8b5e3c" roughness={0.8} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[0, 6.1, 0]} rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[3.25, 1.8, 4]} />
+        <meshStandardMaterial color="#2f5f8a" roughness={0.7} flatShading />
+      </mesh>
+      <mesh position={[0, 0.85, 2.01]}>
+        <boxGeometry args={[0.95, 1.7, 0.06]} />
+        <meshStandardMaterial color="#6b4428" roughness={0.8} />
+      </mesh>
+      {[1.55, 4].flatMap((y) =>
+        [-1.25, 1.25].map((x) => (
+          <mesh key={`${x}:${y}`} position={[x, y, 2.01]}>
+            <boxGeometry args={[0.75, 0.75, 0.06]} />
+            <meshStandardMaterial {...GLASS} />
+          </mesh>
+        )),
+      )}
+      <mesh position={[0, 4, 2.01]}>
+        <boxGeometry args={[0.75, 0.75, 0.06]} />
+        <meshStandardMaterial {...GLASS} />
+      </mesh>
+      {[1.55, 4].flatMap((y) =>
+        [-2.01, 2.01].map((x) => (
+          <mesh key={`s${x}:${y}`} position={[x, y, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <boxGeometry args={[0.9, 0.75, 0.06]} />
+            <meshStandardMaterial {...GLASS} />
+          </mesh>
+        )),
+      )}
+    </group>
+  );
+}
+
+export function PotionModel({ color = "#e0457b" }: { color?: string }) {
+  return (
+    <group>
+      <mesh castShadow position={[0, 0.22, 0]}>
+        <sphereGeometry args={[0.22, 20, 14]} />
+        <meshPhysicalMaterial color="#dff3ff" transmission={0.6} roughness={0.08} thickness={0.2} />
+      </mesh>
+      <mesh position={[0, 0.2, 0]}>
+        <sphereGeometry args={[0.17, 18, 12]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.55} roughness={0.3} />
+      </mesh>
+      <mesh castShadow position={[0, 0.5, 0]}>
+        <cylinderGeometry args={[0.07, 0.09, 0.2, 12]} />
+        <meshPhysicalMaterial color="#dff3ff" transmission={0.6} roughness={0.08} />
+      </mesh>
+      <mesh position={[0, 0.63, 0]}>
+        <cylinderGeometry args={[0.08, 0.07, 0.08, 12]} />
+        <meshStandardMaterial color="#8b5e3c" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+}

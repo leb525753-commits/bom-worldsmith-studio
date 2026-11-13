@@ -1,4 +1,5 @@
-export type ObjKind = "tree" | "house" | "road" | "bush" | "sword" | "part" | "npc";
+export type ObjKind = "tree" | "house" | "road" | "bush" | "sword" | "part" | "npc" | "block" | "house2" | "potion";
+export type BlockEffect = "vanish" | "hurt";
 export type NpcType = "civilian" | "monster";
 export type Vec3 = [number, number, number];
 
@@ -13,6 +14,10 @@ export interface GameObject {
   /** NPC hit points. */
   hp?: number;
   npcType?: NpcType;
+  /** Block touch behaviour (Code Game). */
+  effect?: BlockEffect;
+  /** HP lost per touch for "hurt" blocks. */
+  effectValue?: number;
 }
 
 export interface PlayerSpawn {

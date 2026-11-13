@@ -8,8 +8,9 @@ import { StudioButton } from "@/components/studio/StudioButton";
 import { World } from "@/game/scene/World";
 import { input, runtime } from "@/game/runtime";
 import { useStudio } from "@/game/store";
+import { currentAccount } from "@/game/accounts";
 import { CodeDialog, CodeGameDialog } from "@/game/ui/CodeDialogs";
-import { doDrop, doSwing, NavPad, PlayHud, RotateHint } from "@/game/ui/Overlays";
+import { doDrink, doDrop, doJump, doSwing, NavPad, PlayHud, RotateHint } from "@/game/ui/Overlays";
 import { ControlPanel, ModelStore } from "@/game/ui/Panels";
 
 export const Route = createFileRoute("/studio/$projectId")({
@@ -37,7 +38,9 @@ function useKeyboard() {
       input.keys.add(e.code);
       const st = useStudio.getState();
       if (st.mode === "play" && runtime.current) {
-        if (e.code === "Space" || e.code === "KeyJ") doSwing();
+        if (e.code === "Space" && !e.repeat) doJump();
+        if (e.code === "KeyJ" || e.code === "KeyF") doSwing();
+        if (e.code === "KeyE" && !e.repeat) doDrink();
         if (e.code === "KeyG" || (e.code === "KeyQ" && !e.repeat)) doDrop();
       } else if (e.code === "Escape") st.select(null);
       else if ((e.code === "Delete" || e.code === "Backspace") && st.selectedId) st.remove(st.selectedId);
@@ -69,12 +72,16 @@ function Studio() {
   useEffect(() => autoLockOnFirstTap(), []);
 
   useEffect(() => {
+    if (!currentAccount()) {
+      navigate({ to: "/", replace: true });
+      return;
+    }
     load(projectId);
     return () => {
       runtime.current = null;
       useStudio.setState({ mode: "edit" });
     };
-  }, [projectId, load]);
+  }, [projectId, load, navigate]);
 
   if (!project || project.id !== projectId) {
     return <div className="grid h-dvh place-items-center bg-background text-sm text-muted-foreground">Đang mở dự án…</div>;

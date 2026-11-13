@@ -1,11 +1,17 @@
+import { currentAccount, projectsKey } from "./accounts";
 import type { Project } from "./types";
 
-const KEY = "bom-studio.projects.v1";
+/** Projects are stored per signed-in account. */
+function key(): string | null {
+  const a = currentAccount();
+  return a ? projectsKey(a.key) : null;
+}
 
 function readAll(): Project[] {
-  if (typeof window === "undefined") return [];
+  const k = key();
+  if (typeof window === "undefined" || !k) return [];
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = window.localStorage.getItem(k);
     const list = raw ? (JSON.parse(raw) as unknown) : [];
     return Array.isArray(list) ? (list.filter((p) => p && typeof p.id === "string" && Array.isArray(p.objects)) as Project[]) : [];
   } catch {
@@ -14,7 +20,8 @@ function readAll(): Project[] {
 }
 
 function writeAll(list: Project[]) {
-  window.localStorage.setItem(KEY, JSON.stringify(list));
+  const k = key();
+  if (k) window.localStorage.setItem(k, JSON.stringify(list));
 }
 
 export function listProjects(): Project[] {

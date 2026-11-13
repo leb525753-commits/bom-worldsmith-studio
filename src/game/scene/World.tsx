@@ -5,12 +5,12 @@ import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { KIND_HEIGHT } from "../catalog";
 import { input, runtime, viewCenter } from "../runtime";
-import { heldSword, stepPlay, TUNING, type Actor, type SwordState } from "../sim/play";
+import { heldItem, stepPlay, TUNING, type Actor, type BlockState, type ItemState } from "../sim/play";
 import { useStudio } from "../store";
 import type { GameObject } from "../types";
 import { ObjectToolbar } from "../ui/ObjectToolbar";
 import {
-  animateLimbs, Avatar, Baseplate, BushModel, HouseModel, HpBar, PartModel, RoadModel,
+  animateLimbs, Avatar, Baseplate, BushModel, House2Model, HouseModel, HpBar, PartModel, PotionModel, RoadModel,
   SwordBlade, SwordGroundModel, TreeModel, useLimbs,
 } from "./models";
 
@@ -87,20 +87,24 @@ function PlayStepper() {
     if (M.lengthSq() > 1) M.normalize();
     const px = rt.player.x;
     const pz = rt.player.z;
+    const py = rt.player.y;
     stepPlay(rt, { x: M.x, z: M.z }, dt);
     const dx = rt.player.x - px;
     const dz = rt.player.z - pz;
     state.camera.position.x += dx;
     state.camera.position.z += dz;
+    const dy = rt.player.y - py;
+    state.camera.position.y += dy;
     if (controls) {
+      controls.target.y += dy;
       controls.target.x += dx;
       controls.target.z += dz;
     }
     const st = useStudio.getState();
-    const w = heldSword(rt);
+    const w = heldItem(rt);
     const h = st.hud;
-    const next = { hp: rt.player.hp, holding: !!w, damage: w?.damage ?? 0, dead: !rt.player.alive };
-    if (h.hp !== next.hp || h.holding !== next.holding || h.damage !== next.damage || h.dead !== next.dead) st.setHud(next);
+    const next = { hp: rt.player.hp, holding: w?.kind ?? null, damage: w?.damage ?? 0, dead: !rt.player.alive, speed: rt.player.speed };
+    if (h.hp !== next.hp || h.holding !== next.holding || h.damage !== next.damage || h.dead !== next.dead || h.speed !== next.speed) st.setHud(next);
   });
   return null;
 }
@@ -145,32 +149,53 @@ function ObjectView({ obj, selected }: { obj: GameObject; selected: boolean }) {
       {obj.kind === "road" && <RoadModel color={obj.color} />}
       {obj.kind === "bush" && <BushModel color={obj.color} />}
       {obj.kind === "part" && <PartModel color={obj.color} />}
-      {obj.kind === "sword" && <SwordLive obj={obj} />}
+      {obj.kind === "house2" && <House2Model color={obj.color} />}
+      {obj.kind === "block" && <BlockLive obj={obj} />}
+      {(obj.kind === "sword" || obj.kind === "potion") && <ItemLive obj={obj} />}
       {obj.kind === "npc" && <NpcLive obj={obj} groupRef={ref} />}
       {selected && mode === "edit" && <ObjectToolbar obj={obj} y={KIND_HEIGHT[obj.kind] + 0.3} />}
     </group>
   );
 }
 
-/* Ground sword: hidden while carried, bobs in play so it reads as a pickup. */
-function SwordLive({ obj }: { obj: GameObject }) {
+/* Block: blinks while a touched vanish-block counts down, hidden once gone. */
+function BlockLive({ obj }: { obj: GameObject }) {
   const inner = useRef<THREE.Group>(null);
-  const cache = useRef<SwordState | null>(null);
+  const cache = useRef<BlockState | null>(null);
+  useFrame((state) => {
+    const rt = runtime.current;
+    if (!rt || !inner.current) return;
+    cache.current ??= rt.blocks.find((b) => b.id === obj.id) ?? null;
+    const b = cache.current;
+    if (!b) return;
+    inner.current.visible = !b.gone && (b.timer < 0 || b.timer > 1.2 || Math.sin(state.clock.elapsedTime * 30) > 0);
+  });
+  return (
+    <group ref={inner}>
+      <PartModel color={obj.color} />
+    </group>
+  );
+}
+
+/* Ground sword / potion: hidden while carried, bobs in play so it reads as a pickup. */
+function ItemLive({ obj }: { obj: GameObject }) {
+  const inner = useRef<THREE.Group>(null);
+  const cache = useRef<ItemState | null>(null);
   useFrame((state) => {
     const rt = runtime.current;
     const g = inner.current?.parent;
     if (!rt || !g || !inner.current) return;
-    cache.current ??= rt.swords.find((w) => w.id === obj.id) ?? null;
+    cache.current ??= rt.items.find((w) => w.id === obj.id) ?? null;
     const w = cache.current;
     if (!w) return;
-    g.visible = !w.held;
+    g.visible = !w.held && !w.used;
     g.position.set(w.x, obj.position[1], w.z);
     inner.current.position.y = 0.15 + Math.sin(state.clock.elapsedTime * 3) * 0.08;
     inner.current.rotation.y += 0.02;
   });
   return (
     <group ref={inner}>
-      <SwordGroundModel />
+      {obj.kind === "potion" ? <PotionModel color={obj.color} /> : <SwordGroundModel />}
     </group>
   );
 }
@@ -230,7 +255,7 @@ function PlayerView() {
     }
     const p = rt.player;
     g.visible = p.alive;
-    g.position.set(p.x, 0, p.z);
+    g.position.set(p.x, p.y, p.z);
     g.rotation.y = p.yaw;
     animateLimbs(limbs.current, state.clock.elapsedTime, p.moving, rt.swingT / TUNING.SWING_TIME);
   });
@@ -241,7 +266,11 @@ function PlayerView() {
         skin="#f5cd30"
         shirt="#1f6fd1"
         pants="#4caf50"
-        rightHand={mode === "play" && holding ? <SwordBlade /> : null}
+        rightHand={mode !== "play" || !holding ? null : holding === "sword" ? <SwordBlade /> : (
+          <group position={[0, -0.75, 0.1]} scale={0.8}>
+            <PotionModel />
+          </group>
+        )}
       />
       <HpBar
         y={2.6}

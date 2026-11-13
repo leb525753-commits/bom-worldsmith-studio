@@ -1,8 +1,8 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronsDown, ChevronsUp, Hand, Heart, Smartphone, Swords } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronsDown, ChevronsUp, FlaskConical, Footprints, Hand, Heart, MoveUp, Smartphone, Swords } from "lucide-react";
 import { useRef, useState, type ComponentType, type PointerEvent } from "react";
 import { StudioButton } from "@/components/studio/StudioButton";
 import { input, runtime } from "../runtime";
-import { dropSword, swing } from "../sim/play";
+import { drinkPotion, dropItem, jump, swing } from "../sim/play";
 import { useStudio } from "../store";
 import { lockLandscape } from "../orientation";
 
@@ -102,7 +102,16 @@ export function doSwing() {
 }
 
 export function doDrop() {
-  if (runtime.current && dropSword(runtime.current)) useStudio.getState().setHud({ holding: false });
+  if (runtime.current && dropItem(runtime.current)) useStudio.getState().setHud({ holding: null });
+}
+
+export function doJump() {
+  if (runtime.current) jump(runtime.current);
+}
+
+export function doDrink() {
+  const rt = runtime.current;
+  if (rt && drinkPotion(rt)) useStudio.getState().setHud({ holding: null, speed: rt.player.speed });
 }
 
 export function PlayHud() {
@@ -122,22 +131,42 @@ export function PlayHud() {
         <div className="h-2.5 overflow-hidden rounded-full bg-hp-track">
           <div className="h-full rounded-full bg-hp transition-[width] duration-300" style={{ width: `${pct}%` }} />
         </div>
-        {hud.holding && <p className="mt-1.5 text-center text-[11px] text-muted-foreground">Đang cầm kiếm · {hud.damage} dame</p>}
+        <p className="mt-1.5 flex items-center justify-center gap-1 text-center text-[11px] text-muted-foreground">
+          <Footprints className="h-3 w-3" /> Tốc độ {hud.speed}
+          {hud.holding === "sword" && <> · Đang cầm kiếm · {hud.damage} dame</>}
+          {hud.holding === "potion" && <> · Đang cầm bình thuốc</>}
+        </p>
       </div>
       <p className="pointer-events-none absolute left-3 top-3 hidden rounded-md bg-overlay px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-md xl:block">
-        WASD / joystick để đi · Space chém · Q thả
+        WASD / joystick để đi · Space nhảy · J chém · E uống · Q thả
       </p>
       <Joystick />
-      {hud.holding && !hud.dead && (
+      {!hud.dead && (
         <div className="pointer-events-auto absolute bottom-5 right-4 flex items-end gap-3">
-          <StudioButton variant="action" size="round" onClick={doDrop}>
+          {hud.holding && (
+            <StudioButton variant="action" size="round" onClick={doDrop}>
+              <span className="flex flex-col items-center gap-0.5">
+                <Hand className="h-5 w-5" /> Thả
+              </span>
+            </StudioButton>
+          )}
+          {hud.holding === "potion" && (
+            <StudioButton variant="action" size="round" onClick={doDrink}>
+              <span className="flex flex-col items-center gap-0.5">
+                <FlaskConical className="h-5 w-5" /> Uống
+              </span>
+            </StudioButton>
+          )}
+          {hud.holding === "sword" && (
+            <StudioButton variant="primary" size="round" className="h-20 w-20 rounded-full" onPointerDown={doSwing}>
+              <span className="flex flex-col items-center gap-0.5">
+                <Swords className="h-6 w-6" /> Chém
+              </span>
+            </StudioButton>
+          )}
+          <StudioButton variant="play" size="round" className="h-20 w-20 rounded-full" onPointerDown={doJump}>
             <span className="flex flex-col items-center gap-0.5">
-              <Hand className="h-5 w-5" /> Thả
-            </span>
-          </StudioButton>
-          <StudioButton variant="primary" size="round" className="h-20 w-20 rounded-full" onPointerDown={doSwing}>
-            <span className="flex flex-col items-center gap-0.5">
-              <Swords className="h-6 w-6" /> Chém
+              <MoveUp className="h-6 w-6" /> Nhảy
             </span>
           </StudioButton>
         </div>

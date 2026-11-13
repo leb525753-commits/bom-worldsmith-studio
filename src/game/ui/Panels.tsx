@@ -1,4 +1,4 @@
-import { Box, Braces, Code, House, ListTree, Play, Route, Save, Shrub, Square, Sword, Terminal, TreeDeciduous, User } from "lucide-react";
+import { Box, Braces, Building2, Code, FlaskConical, House, ListTree, Play, Route, Save, Shrub, Square, Sword, Terminal, TreeDeciduous, User } from "lucide-react";
 import { useMemo, type ComponentType } from "react";
 import { toast } from "sonner";
 import { StudioButton } from "@/components/studio/StudioButton";
@@ -13,6 +13,8 @@ const STORE: Array<{ kind: ObjKind; label: string; hint: string; Icon: Component
   { kind: "road", label: "Đường", hint: "Đoạn đường xám", Icon: Route },
   { kind: "bush", label: "Bụi cây", hint: "Cụm lá thấp", Icon: Shrub },
   { kind: "sword", label: "Kiếm", hint: "10 dame", Icon: Sword },
+  { kind: "house2", label: "Nhà 2 tầng", hint: "Nhà cao có 2 tầng", Icon: Building2 },
+  { kind: "potion", label: "Bình thuốc", hint: "Uống: +5 tốc độ", Icon: FlaskConical },
 ];
 
 export function ModelStore() {

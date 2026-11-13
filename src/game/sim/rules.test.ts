@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeObject, makeProject } from "../catalog";
 import { applyCode, objectsToCode, parseGameCode } from "./codeParser";
-import { createPlayState, dropSword, stepPlay, swing } from "./play";
+import { createPlayState, drinkPotion, dropSword, jump, stepPlay, swing } from "./play";
 
 const proj = () => makeProject("p", "test", 0);
 
@@ -59,14 +59,14 @@ describe("Play rules", () => {
     const s = createPlayState(p);
     s.npcs[0]!.wait = 99;
     stepPlay(s, { x: 0, z: 0 }, 0.016);
-    expect(s.heldSwordId).toBe(p.objects[0]!.id);
+    expect(s.heldId).toBe(p.objects[0]!.id);
     swing(s);
     expect(s.npcs[0]!.hp).toBe(20);
     s.swingCd = 0;
     swing(s);
     expect(s.npcs[0]!.alive).toBe(false);
     expect(dropSword(s)).toBe(true);
-    expect(s.heldSwordId).toBeNull();
+    expect(s.heldId).toBeNull();
   });
   it("a monster next to the player deals its damage", () => {
     const p = proj();
@@ -75,5 +75,54 @@ describe("Play rules", () => {
     const s = createPlayState(p);
     stepPlay(s, { x: 0, z: 0 }, 0.016);
     expect(s.player.hp).toBe(95);
+  });
+});
+
+describe("Blocks, potion, jump", () => {
+  it("parses a red vanish block and a white block that costs 10 HP", () => {
+    const r = parseGameCode("-tạo block-màu đỏ\n+thêm chức năng=chạm biến mất\n-tạo block-màu trắng\n+thêm chức năng=chạm mất 10 máu");
+    expect(r.errors).toHaveLength(0);
+    expect(r.commands).toEqual([
+      { type: "block", colorName: "đỏ", color: "#c4281c", effect: "vanish" },
+      { type: "block", colorName: "trắng", color: "#f2f3f3", effect: "hurt", value: 10 },
+    ]);
+  });
+  it("accepts only the 5 block colors", () => {
+    for (const c of ["trắng", "đỏ", "xanh lá", "xanh biển", "đen"]) expect(parseGameCode(`-tạo block-màu ${c}`).errors).toHaveLength(0);
+    expect(parseGameCode("-tạo block-màu tím").errors).toHaveLength(1);
+  });
+  it("a vanish block disappears 3 seconds after it is touched", () => {
+    const p = proj();
+    p.player.position = [0, 0, 0];
+    p.objects = [makeObject("block", [1.2, 0, 0], { effect: "vanish" })];
+    const s = createPlayState(p);
+    stepPlay(s, { x: 0, z: 0 }, 0.016);
+    for (let i = 0; i < 180; i++) stepPlay(s, { x: 0, z: 0 }, 0.016);
+    expect(s.blocks[0]!.gone).toBe(false);
+    for (let i = 0; i < 10; i++) stepPlay(s, { x: 0, z: 0 }, 0.016);
+    expect(s.blocks[0]!.gone).toBe(true);
+  });
+  it("a hurt block takes 10 HP on touch", () => {
+    const p = proj();
+    p.player.position = [0, 0, 0];
+    p.objects = [makeObject("block", [1.2, 0, 0], { effect: "hurt", effectValue: 10 })];
+    const s = createPlayState(p);
+    stepPlay(s, { x: 0, z: 0 }, 0.016);
+    expect(s.player.hp).toBe(90);
+  });
+  it("drinking a potion adds 5 run speed", () => {
+    const p = proj();
+    p.player.position = [0, 0, 0];
+    p.objects = [makeObject("potion", [0.3, 0, 0])];
+    const s = createPlayState(p);
+    stepPlay(s, { x: 0, z: 0 }, 0.016);
+    expect(drinkPotion(s)).toBe(true);
+    expect(s.player.speed).toBe(11);
+  });
+  it("jumping lifts the player off the ground", () => {
+    const s = createPlayState(proj());
+    expect(jump(s)).toBe(true);
+    stepPlay(s, { x: 0, z: 0 }, 0.1);
+    expect(s.player.y).toBeGreaterThan(0.5);
   });
 });

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { makeObject, makeProject } from "./catalog";
 import { runtime, viewCenter } from "./runtime";
-import { createPlayState } from "./sim/play";
+import { createPlayState, type ItemKind } from "./sim/play";
 import { getProject, saveProject } from "./storage";
 import type { GameObject, ObjKind, Project, Vec3 } from "./types";
 
@@ -10,7 +10,8 @@ export type Gizmo = "none" | "translate" | "scale";
 export interface Hud {
   hp: number;
   maxHp: number;
-  holding: boolean;
+  holding: ItemKind | null;
+  speed: number;
   damage: number;
   dead: boolean;
 }
@@ -45,7 +46,7 @@ export function spawnPoint(spread = 1.5): Vec3 {
   return [+(viewCenter.x + r()).toFixed(2), 0, +(viewCenter.z + r()).toFixed(2)];
 }
 
-const emptyHud: Hud = { hp: 100, maxHp: 100, holding: false, damage: 0, dead: false };
+const emptyHud: Hud = { hp: 100, maxHp: 100, holding: null, speed: 6, damage: 0, dead: false };
 
 export const useStudio = create<StudioState>((set, get) => {
   const patchProject = (fn: (p: Project) => Project) => {
@@ -96,7 +97,7 @@ export const useStudio = create<StudioState>((set, get) => {
         selectedId: null,
         gizmo: "none",
         session: get().session + 1,
-        hud: { hp: p.player.hp, maxHp: p.player.hp, holding: false, damage: 0, dead: false },
+        hud: { ...emptyHud, hp: p.player.hp, maxHp: p.player.hp },
       });
     },
     stop: () => {

@@ -1,9 +1,10 @@
-import { DEFAULT_HP, DEFAULT_MONSTER_DAMAGE, codeLabel } from "../catalog";
-import type { GameObject, NpcType, ObjKind } from "../types";
+import { BLOCK_COLORS, DEFAULT_HP, DEFAULT_MONSTER_DAMAGE, codeLabel } from "../catalog";
+import type { BlockEffect, GameObject, NpcType, ObjKind } from "../types";
 
 export type GameCommand =
   | { type: "npc"; npcType: NpcType; hp: number; damage: number }
-  | { type: "object"; kind: Exclude<ObjKind, "npc"> };
+  | { type: "block"; colorName: string; color: string; effect?: BlockEffect; value?: number }
+  | { type: "object"; kind: Exclude<ObjKind, "npc" | "block"> };
 
 export interface CodeError {
   line: number;
@@ -18,7 +19,9 @@ export interface ParseResult {
 
 const norm = (s: string) => s.normalize("NFC").toLowerCase().replace(/\s+/g, " ").trim();
 
-const OBJECT_ALIASES: Array<[RegExp, Exclude<ObjKind, "npc">]> = [
+const OBJECT_ALIASES: Array<[RegExp, Exclude<ObjKind, "npc" | "block">]> = [
+  [/^(một )?(ngôi )?nhà 2 tầng$/, "house2"],
+  [/^(một )?(bình thuốc|thuốc)$/, "potion"],
   [/^(một )?(cây táo|cây)$/, "tree"],
   [/^(một )?(ngôi )?nhà$/, "house"],
   [/^(một )?(đoạn )?đường$/, "road"],
@@ -31,6 +34,8 @@ const NPC_HEADER = /^-\s*tạo\s+(?:một\s+)?npc(?:\s*-?\s*máu\s*:?\s*\[?\s*(\
 const CIVILIAN = /^-\s*dân thường$/;
 const MONSTER = /^-\s*quái vật$/;
 const DAMAGE = /^\+\s*\[?\s*(\d+)\s*\]?\s*(?:dame|damage|dmg)$/;
+const BLOCK = /^-\s*tạo\s+(?:một\s+)?block(?:\s*-?\s*màu\s*:?\s*(.*))?$/;
+const FEATURE = /^\+\s*thêm\s+chức\s+năng\s*[=:]?\s*(.+)$/;
 const CREATE = /^-\s*tạo\s+(.+)$/;
 
 /** Parses the "Code Game" script into spawn commands. */
@@ -38,8 +43,11 @@ export function parseGameCode(src: string): ParseResult {
   const commands: GameCommand[] = [];
   const errors: CodeError[] = [];
   let pending: { hp: number; npcType?: NpcType; damage?: number } | null = null;
+  let block: Extract<GameCommand, { type: "block" }> | null = null;
 
   const flush = () => {
+    if (block) commands.push(block);
+    block = null;
     if (!pending) return;
     const npcType = pending.npcType ?? "civilian";
     commands.push({
@@ -59,7 +67,28 @@ export function parseGameCode(src: string): ParseResult {
       errors.push({ line: i + 1, text: raw.trim(), message });
     };
 
-    let m = line.match(NPC_HEADER);
+    let m = line.match(BLOCK);
+    if (m) {
+      flush();
+      const name = (m[1] ?? "trắng").replace(/[[\]{}<>()]/g, "").trim() || "trắng";
+      const color = BLOCK_COLORS[name];
+      if (!color) return err(`Màu “${name}” không có. Chọn: trắng, đỏ, xanh lá, xanh biển, đen`);
+      block = { type: "block", colorName: name, color };
+      return;
+    }
+    m = line.match(FEATURE);
+    if (m) {
+      if (!block) return err("Dòng “+thêm chức năng” phải nằm ngay dưới “-tạo block”");
+      const f = (m[1] ?? "").replace(/[{}<>[\]]/g, " ").replace(/\s+/g, " ");
+      const hurt = f.match(/chạm\s+(?:là\s+)?mất\s+(\d+)\s*máu/);
+      if (hurt) {
+        block.effect = "hurt";
+        block.value = parseInt(hurt[1] ?? "10", 10);
+      } else if (/chạm\s+(?:là\s+)?biến\s+mất/.test(f)) block.effect = "vanish";
+      else return err("Chức năng chưa hỗ trợ. Dùng “chạm biến mất” hoặc “chạm mất 10 máu”");
+      return;
+    }
+    m = line.match(NPC_HEADER);
     if (m) {
       flush();
       pending = { hp: m[1] ? Math.max(1, parseInt(m[1], 10)) : DEFAULT_HP };

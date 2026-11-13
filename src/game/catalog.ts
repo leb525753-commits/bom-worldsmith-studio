@@ -1,4 +1,4 @@
-import type { GameObject, NpcType, ObjKind, Project, Vec3 } from "./types";
+import type { BlockEffect, GameObject, NpcType, ObjKind, Project, Vec3 } from "./types";
 
 export const DEFAULT_HP = 100;
 export const DEFAULT_SWORD_DAMAGE = 10;
@@ -20,6 +20,9 @@ export const KIND_NAME: Record<ObjKind, string> = {
   sword: "Kiếm",
   part: "Part",
   npc: "NPC",
+  block: "Block",
+  house2: "Nhà 2 tầng",
+  potion: "Bình thuốc",
 };
 
 const DEFAULT_COLOR: Record<ObjKind, string> = {
@@ -30,6 +33,9 @@ const DEFAULT_COLOR: Record<ObjKind, string> = {
   sword: "#c9ced6",
   part: PART_DEFAULT_COLOR,
   npc: "#4b974b",
+  block: "#f2f3f3",
+  house2: "#e8d9bf",
+  potion: "#e0457b",
 };
 
 /** Approximate top of each model at scale 1, used to place the floating toolbar. */
@@ -41,6 +47,18 @@ export const KIND_HEIGHT: Record<ObjKind, number> = {
   sword: 0.6,
   part: 1.2,
   npc: 2.9,
+  block: 1.2,
+  house2: 7.2,
+  potion: 0.8,
+};
+
+/** The 5 block colors available in Code Game ("-tạo block-màu đỏ"). */
+export const BLOCK_COLORS: Record<string, string> = {
+  "trắng": "#f2f3f3",
+  "đỏ": "#c4281c",
+  "xanh lá": "#4b974b",
+  "xanh biển": "#0d69ac",
+  "đen": "#1c1c1f",
 };
 
 export function newId(): string {
@@ -52,7 +70,7 @@ export function newId(): string {
 export function makeObject(
   kind: ObjKind,
   position: Vec3,
-  opts: { id?: string; npcType?: NpcType; hp?: number; damage?: number } = {},
+  opts: { id?: string; npcType?: NpcType; hp?: number; damage?: number; color?: string; effect?: BlockEffect | undefined; effectValue?: number | undefined } = {},
 ): GameObject {
   const obj: GameObject = {
     id: opts.id ?? newId(),
@@ -61,6 +79,11 @@ export function makeObject(
     scale: [1, 1, 1],
     color: DEFAULT_COLOR[kind],
   };
+  if (opts.color) obj.color = opts.color;
+  if (kind === "block" && opts.effect) {
+    obj.effect = opts.effect;
+    if (opts.effect === "hurt") obj.effectValue = opts.effectValue ?? 10;
+  }
   if (kind === "sword") obj.damage = opts.damage ?? DEFAULT_SWORD_DAMAGE;
   if (kind === "npc") {
     obj.npcType = opts.npcType ?? "civilian";
@@ -98,6 +121,12 @@ export function codeLabel(o: GameObject): string {
       return "kiếm";
     case "part":
       return "part";
+    case "block":
+      return "block";
+    case "house2":
+      return "nhà 2 tầng";
+    case "potion":
+      return "bình thuốc";
     case "npc":
       return o.npcType === "monster" ? "quái vật" : "npc dân thường";
   }
