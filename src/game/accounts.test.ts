@@ -1,18 +1,14 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { currentAccount, login } from "./accounts";
+import { describe, expect, it } from "vitest";
+import { authEmail, authPassword } from "./accountKeys";
 
-describe("accounts", () => {
-  beforeEach(() => localStorage.clear());
-  it("a new name creates the account and signs in", async () => {
-    expect(await login("Bờm", "123")).toEqual({ ok: true, name: "Bờm", created: true });
-    expect(currentAccount()?.name).toBe("Bờm");
+describe("account names", () => {
+  it("the same name in any letter case signs into the same account", async () => {
+    expect(await authEmail("Bờm  Lê")).toBe(await authEmail("bờm lê"));
   });
-  it("the same name with the right password signs in", async () => {
-    await login("Bờm", "123");
-    expect((await login("Bờm", "123")).ok).toBe(true);
+  it("different names are different accounts", async () => {
+    expect(await authEmail("Bờm")).not.toBe(await authEmail("Bơm"));
   });
-  it("the same name with a wrong password is refused", async () => {
-    await login("Bờm", "123");
-    expect(await login("Bờm", "sai")).toEqual({ ok: false, error: "Sai mật khẩu" });
+  it("a 1-character password is still accepted", () => {
+    expect(authPassword("1").length).toBeGreaterThanOrEqual(6);
   });
 });

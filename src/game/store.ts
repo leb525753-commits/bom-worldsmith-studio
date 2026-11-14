@@ -1,8 +1,9 @@
 import { create } from "zustand";
-import { makeObject, makeProject } from "./catalog";
+import { makeObject } from "./catalog";
 import { runtime, viewCenter } from "./runtime";
 import { createPlayState, type ItemKind } from "./sim/play";
-import { getProject, saveProject } from "./storage";
+import type { Account } from "./accounts";
+import { saveProject } from "./storage";
 import type { GameObject, ObjKind, Project, Vec3 } from "./types";
 
 export type Gizmo = "none" | "translate" | "scale";
@@ -18,13 +19,14 @@ export interface Hud {
 
 interface StudioState {
   project: Project | null;
+  account: Account | null;
   dirty: boolean;
   mode: "edit" | "play";
   session: number;
   selectedId: string | null;
   gizmo: Gizmo;
   hud: Hud;
-  load: (id: string) => void;
+  open: (project: Project, isNew: boolean, account: Account) => void;
   rename: (name: string) => void;
   setScript: (script: string) => void;
   spawn: (kind: ObjKind, opts?: Parameters<typeof makeObject>[2]) => GameObject;
@@ -36,7 +38,7 @@ interface StudioState {
   setGizmo: (g: Gizmo) => void;
   play: () => void;
   stop: () => void;
-  save: () => void;
+  save: () => Promise<void>;
   setHud: (h: Partial<Hud>) => void;
 }
 
@@ -55,6 +57,7 @@ export const useStudio = create<StudioState>((set, get) => {
   };
   return {
     project: null,
+    account: null,
     dirty: false,
     mode: "edit",
     session: 0,
@@ -62,12 +65,9 @@ export const useStudio = create<StudioState>((set, get) => {
     gizmo: "none",
     hud: emptyHud,
 
-    load: (id) => {
+    open: (project, isNew, account) => {
       runtime.current = null;
-      const saved = getProject(id);
-      const now = Date.now();
-      const project = saved ?? makeProject(id, `Dự án ${new Date(now).toLocaleDateString("vi-VN")}`, now);
-      set({ project, dirty: !saved, mode: "edit", selectedId: null, gizmo: "none", session: get().session + 1 });
+      set({ project, account, dirty: isNew, mode: "edit", selectedId: null, gizmo: "none", session: get().session + 1 });
     },
     rename: (name) => patchProject((p) => ({ ...p, name })),
     setScript: (script) => patchProject((p) => ({ ...p, script })),
@@ -105,11 +105,11 @@ export const useStudio = create<StudioState>((set, get) => {
       runtime.current = null;
       set({ mode: "edit", session: get().session + 1, hud: emptyHud });
     },
-    save: () => {
-      const p = get().project;
-      if (!p) return;
+    save: async () => {
+      const { project: p, account } = get();
+      if (!p || !account) return;
       const saved = { ...p, updatedAt: Date.now() };
-      saveProject(saved);
+      await saveProject(saved, account);
       set({ project: saved, dirty: false });
     },
     setHud: (h) => set({ hud: { ...get().hud, ...h } }),
