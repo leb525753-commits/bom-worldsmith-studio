@@ -6,11 +6,15 @@ import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
 import { StudioButton } from "@/components/studio/StudioButton";
 import { World } from "@/game/scene/World";
-import { input, runtime } from "@/game/runtime";
+import { runtime } from "@/game/runtime";
 import { useStudio } from "@/game/store";
-import { currentAccount } from "@/game/accounts";
+import { getAccount } from "@/game/accounts";
+import { makeProject } from "@/game/catalog";
+import { getGame } from "@/game/storage";
+import { AiChat } from "@/game/ui/AiChat";
+import { useKeyboard } from "@/game/ui/useKeyboard";
 import { CodeDialog, CodeGameDialog } from "@/game/ui/CodeDialogs";
-import { doDrink, doDrop, doJump, doSwing, NavPad, PlayHud, RotateHint } from "@/game/ui/Overlays";
+import { NavPad, PlayHud, RotateHint } from "@/game/ui/Overlays";
 import { ControlPanel, ModelStore } from "@/game/ui/Panels";
 
 export const Route = createFileRoute("/studio/$projectId")({
@@ -28,60 +32,37 @@ export const Route = createFileRoute("/studio/$projectId")({
   component: Studio,
 });
 
-function useKeyboard() {
-  useEffect(() => {
-    const isTyping = (t: EventTarget | null) =>
-      t instanceof HTMLElement && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
-    const down = (e: KeyboardEvent) => {
-      if (isTyping(e.target)) return;
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
-      input.keys.add(e.code);
-      const st = useStudio.getState();
-      if (st.mode === "play" && runtime.current) {
-        if (e.code === "Space" && !e.repeat) doJump();
-        if (e.code === "KeyJ" || e.code === "KeyF") doSwing();
-        if (e.code === "KeyE" && !e.repeat) doDrink();
-        if (e.code === "KeyG" || (e.code === "KeyQ" && !e.repeat)) doDrop();
-      } else if (e.code === "Escape") st.select(null);
-      else if ((e.code === "Delete" || e.code === "Backspace") && st.selectedId) st.remove(st.selectedId);
-    };
-    const up = (e: KeyboardEvent) => input.keys.delete(e.code);
-    const clear = () => input.keys.clear();
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    window.addEventListener("blur", clear);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-      window.removeEventListener("blur", clear);
-    };
-  }, []);
-}
-
 function Studio() {
   const { projectId } = Route.useParams();
   const navigate = useNavigate();
   const project = useStudio((s) => s.project);
-  const load = useStudio((s) => s.load);
+  const openProject = useStudio((s) => s.open);
   const rename = useStudio((s) => s.rename);
   const dirty = useStudio((s) => s.dirty);
   const mode = useStudio((s) => s.mode);
-  const [dialog, setDialog] = useState<"code" | "game" | null>(null);
+  const [dialog, setDialog] = useState<"code" | "game" | "ai" | null>(null);
   const [ready, setReady] = useState(false);
   useKeyboard();
   useEffect(() => autoLockOnFirstTap(), []);
 
   useEffect(() => {
-    if (!currentAccount()) {
-      navigate({ to: "/", replace: true });
-      return;
-    }
-    load(projectId);
+    let off = false;
+    void (async () => {
+      const acc = await getAccount();
+      if (off) return;
+      if (!acc) return navigate({ to: "/", replace: true });
+      const g = await getGame(projectId).catch(() => null);
+      if (off) return;
+      if (g && g.ownerId !== acc.id) return navigate({ to: "/play/$gameId", params: { gameId: projectId }, replace: true });
+      if (g) openProject(g.project, false, acc);
+      else openProject(makeProject(projectId, "Dự án mới", Date.now()), true, acc);
+    })();
     return () => {
+      off = true;
       runtime.current = null;
       useStudio.setState({ mode: "edit" });
     };
-  }, [projectId, load, navigate]);
+  }, [projectId, openProject, navigate]);
 
   if (!project || project.id !== projectId) {
     return <div className="grid h-dvh place-items-center bg-background text-sm text-muted-foreground">Đang mở dự án…</div>;
@@ -143,11 +124,12 @@ function Studio() {
             )}
           </div>
         </main>
-        <ControlPanel onCode={() => setDialog("code")} onCodeGame={() => setDialog("game")} />
+        <ControlPanel onCode={() => setDialog("code")} onCodeGame={() => setDialog("game")} onAi={() => setDialog("ai")} />
       </div>
 
       {dialog === "code" && <CodeDialog onClose={() => setDialog(null)} />}
       {dialog === "game" && <CodeGameDialog onClose={() => setDialog(null)} />}
+      {dialog === "ai" && <AiChat onClose={() => setDialog(null)} />}
       <RotateHint />
       <Toaster theme="dark" position="top-center" richColors />
     </div>

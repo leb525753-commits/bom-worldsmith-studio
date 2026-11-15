@@ -1,4 +1,4 @@
-import { Box, Braces, Building2, Code, FlaskConical, House, ListTree, Play, Route, Save, Shrub, Square, Sword, Terminal, TreeDeciduous, User } from "lucide-react";
+import { Bot, Box, Braces, Building2, Code, FlaskConical, House, ListTree, Play, Route, Save, Shrub, Square, Sword, Terminal, TreeDeciduous, User } from "lucide-react";
 import { useMemo, type ComponentType } from "react";
 import { toast } from "sonner";
 import { StudioButton } from "@/components/studio/StudioButton";
@@ -48,7 +48,7 @@ export function ModelStore() {
 
 const BTN = "max-lg:h-8 max-lg:gap-1.5 max-lg:px-2 max-lg:text-xs";
 
-export function ControlPanel({ onCode, onCodeGame }: { onCode: () => void; onCodeGame: () => void }) {
+export function ControlPanel({ onCode, onCodeGame, onAi }: { onCode: () => void; onCodeGame: () => void; onAi: () => void }) {
   const mode = useStudio((s) => s.mode);
   const play = useStudio((s) => s.play);
   const stop = useStudio((s) => s.stop);
@@ -78,8 +78,10 @@ export function ControlPanel({ onCode, onCodeGame }: { onCode: () => void; onCod
           className={BTN}
           disabled={playing}
           onClick={() => {
-            save();
-            toast.success("Đã lưu dự án");
+            save().then(
+              () => toast.success("Đã lưu dự án"),
+              () => toast.error("Lưu thất bại, hãy thử lại"),
+            );
           }}
         >
           <Save className="h-4 w-4" /> Lưu
@@ -92,6 +94,9 @@ export function ControlPanel({ onCode, onCodeGame }: { onCode: () => void; onCod
         </StudioButton>
         <StudioButton block className={BTN} disabled={playing} onClick={onCodeGame}>
           <Terminal className="h-4 w-4" /> Code Game
+        </StudioButton>
+        <StudioButton variant="primary" block className={BTN} disabled={playing} onClick={onAi}>
+          <Bot className="h-4 w-4" /> AI
         </StudioButton>
       </div>
       <div className="panel-title border-t">

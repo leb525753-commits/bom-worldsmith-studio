@@ -1,13 +1,12 @@
 import { autoLockOnFirstTap } from "@/game/orientation";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Clock, FolderOpen, LogIn, LogOut, Plus, Trash2, UserRound } from "lucide-react";
+import { Clock, FolderOpen, Gamepad2, LogIn, LogOut, Plus, Trash2, UserRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { StudioButton } from "@/components/studio/StudioButton";
 import splash from "@/assets/splash-world.jpg";
-import { currentAccount, login, logout } from "@/game/accounts";
+import { getAccount, login, logout, type Account } from "@/game/accounts";
 import { newId } from "@/game/catalog";
-import { deleteProject, listProjects } from "@/game/storage";
-import type { Project } from "@/game/types";
+import { deleteProject, importLocalProjects, listGames, type GameSummary } from "@/game/storage";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,17 +24,20 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[] | null>(null);
-  const [account, setAccount] = useState<{ name: string } | null | undefined>(undefined);
+  const [projects, setProjects] = useState<GameSummary[] | null>(null);
+  const [account, setAccount] = useState<Account | null | undefined>(undefined);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const refresh = async (acc: Account) => setProjects(await listGames(acc.id).catch(() => []));
   useEffect(() => {
-    setAccount(currentAccount());
-    setProjects(listProjects());
+    void getAccount().then((acc) => {
+      setAccount(acc);
+      if (acc) void refresh(acc);
+    });
   }, []);
 
   const submit = async (e: FormEvent) => {
@@ -46,8 +48,12 @@ function Home() {
     if (!r.ok) return setError(r.error);
     setError("");
     setPass("");
-    setAccount({ name: r.name });
-    setProjects(listProjects());
+    const acc = await getAccount();
+    setAccount(acc);
+    if (acc) {
+      await importLocalProjects(acc);
+      void refresh(acc);
+    }
   };
   const field =
     "h-11 w-full rounded-lg border border-border bg-input px-3 text-sm outline-none focus:border-primary";
@@ -95,7 +101,7 @@ function Home() {
             type="button"
             className="ml-1 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
             onClick={() => {
-              logout();
+              void logout();
               setAccount(null);
               setShowForm(true);
               setProjects([]);
@@ -104,9 +110,14 @@ function Home() {
             <LogOut className="h-3.5 w-3.5" /> Đăng xuất
           </button>
         </div>
-        <StudioButton variant="primary" size="xl" className="animate-float-in [animation-delay:120ms]" onClick={() => open(newId())}>
-          <Plus className="h-5 w-5" /> Tạo dự án
-        </StudioButton>
+        <div className="flex flex-wrap items-center justify-center gap-3 animate-float-in [animation-delay:120ms]">
+          <StudioButton variant="primary" size="xl" onClick={() => open(newId())}>
+            <Plus className="h-5 w-5" /> Tạo dự án
+          </StudioButton>
+          <StudioButton variant="play" size="xl" onClick={() => navigate({ to: "/games" })}>
+            <Gamepad2 className="h-5 w-5" /> Game
+          </StudioButton>
+        </div>
 
         <section className="w-full animate-float-in [animation-delay:220ms]">
           <h2 className="mb-2 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -125,7 +136,7 @@ function Home() {
                     className="w-full rounded-xl border border-border bg-overlay p-3 text-left backdrop-blur-md transition-colors hover:border-primary hover:bg-accent"
                   >
                     <span className="block truncate pr-7 text-sm font-semibold">{p.name || "Dự án"}</span>
-                    <span className="mt-1 block text-xs text-muted-foreground">{p.objects.length} vật thể</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{p.objectCount} vật thể</span>
                     <span className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
                       <Clock className="h-3 w-3" />
                       {new Date(p.updatedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
@@ -136,8 +147,8 @@ function Home() {
                     aria-label={`Xóa ${p.name}`}
                     onClick={() => {
                       if (!window.confirm(`Xóa dự án “${p.name}”?`)) return;
-                      deleteProject(p.id);
-                      setProjects(listProjects());
+                      setProjects((list) => list?.filter((x) => x.id !== p.id) ?? null);
+                      void deleteProject(p.id);
                     }}
                     className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-destructive hover:text-destructive-foreground"
                   >

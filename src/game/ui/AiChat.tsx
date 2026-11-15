@@ -249,7 +249,7 @@ export function AiChat({ onClose }: { onClose: () => void }) {
             <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Hammer className="h-3 w-3" /> AI đặt vật thể trực tiếp vào map
             </span>
-            <PromptInputSubmit status={status === "error" ? undefined : status} onStop={() => abortRef.current?.abort()} />
+            <PromptInputSubmit status={status} onStop={() => abortRef.current?.abort()} />
           </PromptInputFooter>
         </PromptInput>
       </div>

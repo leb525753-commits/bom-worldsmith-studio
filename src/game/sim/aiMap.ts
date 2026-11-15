@@ -33,10 +33,10 @@ export function aiMapObjects(args: unknown): { clear: boolean; objects: GameObje
     const pos: Vec3 = [r2(clamp(num(it.x, 0), -HALF, HALF)), r2(clamp(num(it.y, 0), 0, 60)), r2(clamp(num(it.z, 0), -HALF, HALF))];
     const color = typeof it.color === "string" && /^#[0-9a-f]{6}$/i.test(it.color) ? it.color : undefined;
     const base: ObjKind = kind === "civilian" || kind === "monster" ? "npc" : kind;
-    const obj = makeObject(base, pos, {
-      npcType: kind === "monster" ? "monster" : kind === "civilian" ? "civilian" : undefined,
-      color: base === "part" || base === "block" ? color : undefined,
-    });
+    const opts: Parameters<typeof makeObject>[2] = {};
+    if (kind === "monster" || kind === "civilian") opts.npcType = kind;
+    if ((base === "part" || base === "block") && color) opts.color = color;
+    const obj = makeObject(base, pos, opts);
     obj.scale = [r2(clamp(num(it.sx, 1), 0.2, 30)), r2(clamp(num(it.sy, 1), 0.2, 30)), r2(clamp(num(it.sz, 1), 0.2, 30))];
     objects.push(obj);
   }

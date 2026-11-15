@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as GamesRouteImport } from './routes/games'
 import { Route as ApiAiChatRouteImport } from './routes/api/ai-chat'
+import { Route as PlayGameIdRouteImport } from './routes/play.$gameId'
 import { Route as StudioProjectIdRouteImport } from './routes/studio.$projectId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -18,9 +20,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GamesRoute = GamesRouteImport.update({
+  id: '/games',
+  path: '/games',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAiChatRoute = ApiAiChatRouteImport.update({
   id: '/api/ai-chat',
   path: '/api/ai-chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayGameIdRoute = PlayGameIdRouteImport.update({
+  id: '/play/$gameId',
+  path: '/play/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioProjectIdRoute = StudioProjectIdRouteImport.update({
@@ -31,31 +43,46 @@ const StudioProjectIdRoute = StudioProjectIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/games': typeof GamesRoute
   '/api/ai-chat': typeof ApiAiChatRoute
+  '/play/$gameId': typeof PlayGameIdRoute
   '/studio/$projectId': typeof StudioProjectIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/games': typeof GamesRoute
   '/api/ai-chat': typeof ApiAiChatRoute
+  '/play/$gameId': typeof PlayGameIdRoute
   '/studio/$projectId': typeof StudioProjectIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/games': typeof GamesRoute
   '/api/ai-chat': typeof ApiAiChatRoute
+  '/play/$gameId': typeof PlayGameIdRoute
   '/studio/$projectId': typeof StudioProjectIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/ai-chat' | '/studio/$projectId'
+  fullPaths:
+    '/' | '/games' | '/api/ai-chat' | '/play/$gameId' | '/studio/$projectId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/ai-chat' | '/studio/$projectId'
-  id: '__root__' | '/' | '/api/ai-chat' | '/studio/$projectId'
+  to: '/' | '/games' | '/api/ai-chat' | '/play/$gameId' | '/studio/$projectId'
+  id:
+    | '__root__'
+    | '/'
+    | '/games'
+    | '/api/ai-chat'
+    | '/play/$gameId'
+    | '/studio/$projectId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GamesRoute: typeof GamesRoute
   ApiAiChatRoute: typeof ApiAiChatRoute
+  PlayGameIdRoute: typeof PlayGameIdRoute
   StudioProjectIdRoute: typeof StudioProjectIdRoute
 }
 
@@ -68,11 +95,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/games': {
+      id: '/games'
+      path: '/games'
+      fullPath: '/games'
+      preLoaderRoute: typeof GamesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ai-chat': {
       id: '/api/ai-chat'
       path: '/api/ai-chat'
       fullPath: '/api/ai-chat'
       preLoaderRoute: typeof ApiAiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/play/$gameId': {
+      id: '/play/$gameId'
+      path: '/play/$gameId'
+      fullPath: '/play/$gameId'
+      preLoaderRoute: typeof PlayGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/$projectId': {
@@ -87,7 +128,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GamesRoute: GamesRoute,
   ApiAiChatRoute: ApiAiChatRoute,
+  PlayGameIdRoute: PlayGameIdRoute,
   StudioProjectIdRoute: StudioProjectIdRoute,
 }
 export const routeTree = rootRouteImport
