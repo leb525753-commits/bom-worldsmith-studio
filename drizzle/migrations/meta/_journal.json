@@ -8,6 +8,13 @@
       "when": 1794616445877,
       "tag": "0000_create_games",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794703283419,
+      "tag": "0001_games_visibility_flag",
+      "breakpoints": true
     }
   ]
 }

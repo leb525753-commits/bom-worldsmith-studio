@@ -19,6 +19,7 @@ export type Database = {
           created_at: string
           data: Json
           id: string
+          is_public: boolean
           name: string
           object_count: number
           owner_id: string
@@ -29,6 +30,7 @@ export type Database = {
           created_at?: string
           data: Json
           id: string
+          is_public?: boolean
           name?: string
           object_count?: number
           owner_id?: string
@@ -39,6 +41,7 @@ export type Database = {
           created_at?: string
           data?: Json
           id?: string
+          is_public?: boolean
           name?: string
           object_count?: number
           owner_id?: string
