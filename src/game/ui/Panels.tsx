@@ -1,9 +1,10 @@
-import { Bot, Box, Braces, Building2, Code, FlaskConical, House, ListTree, Play, Route, Save, Shrub, Square, Sword, Terminal, TreeDeciduous, User } from "lucide-react";
-import { useMemo, type ComponentType } from "react";
+import { Bot, Box, Braces, Building2, Code, FlaskConical, House, ImageUp, ListTree, Play, Route, Save, Shrub, Square, Sword, Terminal, TreeDeciduous, User } from "lucide-react";
+import { useMemo, useRef, useState, type ComponentType } from "react";
 import { toast } from "sonner";
 import { StudioButton } from "@/components/studio/StudioButton";
 import { cn } from "@/lib/utils";
 import { displayNames } from "../catalog";
+import { setCover } from "../storage";
 import { useStudio } from "../store";
 import type { ObjKind } from "../types";
 
@@ -59,6 +60,23 @@ export function ControlPanel({ onCode, onCodeGame, onAi }: { onCode: () => void;
   const objects = useStudio((s) => s.project?.objects);
   const names = useMemo(() => displayNames(objects ?? []), [objects]);
   const playing = mode === "play";
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const pickCover = async (file: File | undefined) => {
+    const { project, account } = useStudio.getState();
+    if (!file || !project || !account) return;
+    setUploading(true);
+    try {
+      await save(); // the game must exist online before it can have a cover
+      await setCover(project.id, file, account);
+      toast.success("Đã đổi ảnh bìa game");
+    } catch {
+      toast.error("Không tải được ảnh bìa, hãy thử ảnh khác");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <aside className="flex w-[clamp(8.5rem,15vw,13rem)] shrink-0 flex-col overflow-hidden border-l border-border bg-panel">
@@ -98,6 +116,19 @@ export function ControlPanel({ onCode, onCodeGame, onAi }: { onCode: () => void;
         <StudioButton variant="primary" block className={BTN} disabled={playing} onClick={onAi}>
           <Bot className="h-4 w-4" /> AI
         </StudioButton>
+        <StudioButton block className={BTN} disabled={playing || uploading} onClick={() => fileRef.current?.click()}>
+          <ImageUp className="h-4 w-4" /> {uploading ? "Đang tải…" : "Ảnh bìa"}
+        </StudioButton>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            void pickCover(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
       </div>
       <div className="panel-title border-t">
         <ListTree className="h-3.5 w-3.5" /> Explorer

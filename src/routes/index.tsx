@@ -133,8 +133,11 @@ function Home() {
                   <button
                     type="button"
                     onClick={() => open(p.id)}
-                    className="w-full rounded-xl border border-border bg-overlay p-3 text-left backdrop-blur-md transition-colors hover:border-primary hover:bg-accent"
+                    className="w-full overflow-hidden rounded-xl border border-border bg-overlay p-3 text-left backdrop-blur-md transition-colors hover:border-primary hover:bg-accent"
                   >
+                    {p.coverUrl && (
+                      <img src={p.coverUrl} alt="" loading="lazy" className="-mx-3 -mt-3 mb-2 aspect-video w-[calc(100%+1.5rem)] max-w-none object-cover" />
+                    )}
                     <span className="block truncate pr-7 text-sm font-semibold">{p.name || "Dự án"}</span>
                     <span className="mt-1 block text-xs text-muted-foreground">{p.objectCount} vật thể</span>
                     <span className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">

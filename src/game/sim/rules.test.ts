@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeObject, makeProject } from "../catalog";
 import { applyCode, objectsToCode, parseGameCode } from "./codeParser";
-import { createPlayState, drinkPotion, dropSword, jump, stepPlay, swing } from "./play";
+import { canSwing, createPlayState, drinkPotion, dropSword, hurtPlayer, jump, playersInReach, stepPlay, swing } from "./play";
 
 const proj = () => makeProject("p", "test", 0);
 
@@ -124,5 +124,33 @@ describe("Blocks, potion, jump", () => {
     expect(jump(s)).toBe(true);
     stepPlay(s, { x: 0, z: 0 }, 0.1);
     expect(s.player.y).toBeGreaterThan(0.5);
+  });
+});
+
+describe("player vs player", () => {
+  const withSword = () => {
+    const p = proj();
+    p.objects.push(makeObject("sword", [0, 0, 4]));
+    const s = createPlayState(p);
+    stepPlay(s, { x: 0, z: 0 }, 0.016);
+    return s;
+  };
+  it("a player next to you with a sword in hand can be hit, a far one cannot", () => {
+    const s = withSword();
+    expect(canSwing(s)).toBe(true);
+    const hits = playersInReach(s, [
+      { id: "near", x: 1, z: 4, alive: true },
+      { id: "far", x: 20, z: 4, alive: true },
+      { id: "dead", x: 0.5, z: 4, alive: false },
+    ]);
+    expect(hits).toEqual(["near"]);
+  });
+  it("cannot swing without a sword", () => {
+    expect(canSwing(createPlayState(proj()))).toBe(false);
+  });
+  it("a 10-dame sword hit takes 10 HP from the other player", () => {
+    const s = createPlayState(proj());
+    hurtPlayer(s, 10);
+    expect(s.player.hp).toBe(90);
   });
 });

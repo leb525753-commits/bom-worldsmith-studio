@@ -352,6 +352,32 @@ export function swing(s: PlayState): string[] {
   return hits;
 }
 
+/** Another player in the same room, as seen by this client. */
+export interface PlayerTarget {
+  id: string;
+  x: number;
+  z: number;
+  alive: boolean;
+}
+
+/** True when a swing would happen right now (sword held, alive, not cooling down). */
+export function canSwing(s: PlayState): boolean {
+  return !!heldSword(s) && s.player.alive && s.swingCd <= 0;
+}
+
+/** Other living players close enough to be hit by this player's sword. */
+export function playersInReach(s: PlayState, others: PlayerTarget[]): string[] {
+  return others
+    .filter((o) => o.alive && Math.hypot(o.x - s.player.x, o.z - s.player.z) <= TUNING.SWORD_REACH)
+    .map((o) => o.id);
+}
+
+/** Damage dealt to this player by another player's sword. */
+export function hurtPlayer(s: PlayState, amount: number) {
+  if (!Number.isFinite(amount)) return;
+  damageActor(s.player, Math.min(1000, Math.max(0, amount)));
+}
+
 /** Drops the held item at the player's feet. */
 export function dropItem(s: PlayState): boolean {
   const w = heldItem(s);

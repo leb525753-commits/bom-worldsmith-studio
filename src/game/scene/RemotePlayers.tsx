@@ -7,6 +7,7 @@ import { animateLimbs, Avatar, useLimbs } from "./models";
 
 function RemoteAvatar({ id, name }: { id: string; name: string }) {
   const ref = useRef<THREE.Group>(null);
+  const bar = useRef<HTMLDivElement>(null);
   const limbs = useLimbs();
   const placed = useRef(false);
   useFrame((state, dt) => {
@@ -14,6 +15,7 @@ function RemoteAvatar({ id, name }: { id: string; name: string }) {
     const g = ref.current;
     if (!r || !g) return;
     g.visible = r.alive;
+    if (bar.current) bar.current.style.width = `${Math.max(0, Math.min(100, r.hp ?? 100))}%`;
     const k = placed.current ? 1 - Math.exp(-dt * 12) : 1;
     placed.current = true;
     g.position.x += (r.x - g.position.x) * k;
@@ -30,6 +32,9 @@ function RemoteAvatar({ id, name }: { id: string; name: string }) {
       <Html center position={[0, 2.9, 0]} zIndexRange={[10, 0]}>
         <div className="pointer-events-none whitespace-nowrap rounded-md bg-overlay px-1.5 py-0.5 text-[11px] font-semibold text-foreground backdrop-blur-md">
           {name}
+          <div className="mt-0.5 h-1 w-14 overflow-hidden rounded-full bg-hp-track">
+            <div ref={bar} className="h-full rounded-full bg-hp" style={{ width: "100%" }} />
+          </div>
         </div>
       </Html>
     </group>

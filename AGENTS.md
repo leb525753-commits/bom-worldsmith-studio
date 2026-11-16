@@ -36,4 +36,7 @@ use the editor.
 - Scene objects are keyed by `session` in `World.tsx`, so Play/Stop remount them and reset any runtime-driven transforms.
 - Studio, `/games` and `/play/$gameId` routes use `ssr: false`; games persist in the Cloud `games` table via `src/game/storage.ts` (signed-in players read games with `is_public` plus their own; only the owner writes).
 - Play-together uses one Realtime broadcast/presence room per game (`src/game/multiplayer.ts`); remote positions live in a module Map outside React, like the play runtime.
+- Game covers are stored in the private `game-covers` bucket under `<owner uid>/`; `games.cover_url` holds the path and list views get signed URLs (public buckets are blocked in this workspace).
+- Player-vs-player hits are sent as a `hit` broadcast in the game room; the target client applies the damage to its own runtime (`pvp` in `src/game/multiplayer.ts`).
+- Built-in Bờm AI answers that skip the AI call live in `src/game/aiFree.ts`.
 - Dev builds expose `window.__studio` (the zustand store) for scripted browser checks.

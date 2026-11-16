@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Account } from "./accounts";
 import { runtime } from "./runtime";
+import { hurtPlayer } from "./sim/play";
 
 /** Other players in the same game room. Positions live outside React, like the play runtime. */
 export interface Remote {
@@ -13,11 +14,15 @@ export interface Remote {
   yaw: number;
   moving: boolean;
   alive: boolean;
+  hp: number;
   seen: number;
 }
 type PosMsg = Omit<Remote, "seen">;
 
 export const remotes = new Map<string, Remote>();
+
+/** Sends a sword hit to another player in the room (no-op outside a room). */
+export const pvp: { hit: (targetId: string, damage: number) => void } = { hit: () => {} };
 
 const SEND_MS = 100;
 const HEARTBEAT_MS = 2000;
@@ -38,6 +43,14 @@ export function useMultiplayer(gameId: string | null, me: Account | null) {
       remotes.set(p.id, { ...p, seen: Date.now() });
       if (isNew) sync();
     });
+    ch.on("broadcast", { event: "hit" }, ({ payload }) => {
+      const h = payload as { target?: unknown; damage?: unknown } | undefined;
+      if (!h || h.target !== myId || typeof h.damage !== "number" || !runtime.current) return;
+      hurtPlayer(runtime.current, h.damage);
+    });
+    pvp.hit = (target, damage) => {
+      if (joined) void ch.send({ type: "broadcast", event: "hit", payload: { target, damage, from: myId } });
+    };
     ch.on("presence", { event: "leave" }, ({ key }) => {
       if (remotes.delete(key)) sync();
     });
@@ -54,8 +67,8 @@ export function useMultiplayer(gameId: string | null, me: Account | null) {
       const now = Date.now();
       const p = runtime.current?.player;
       if (joined && p) {
-        const msg: PosMsg = { id: myId, name: me.name, x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +p.yaw.toFixed(2), moving: p.moving, alive: p.alive };
-        const sig = `${msg.x},${msg.y},${msg.z},${msg.yaw},${msg.moving},${msg.alive}`;
+        const msg: PosMsg = { id: myId, name: me.name, x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +p.yaw.toFixed(2), moving: p.moving, alive: p.alive, hp: p.hp };
+        const sig = `${msg.x},${msg.y},${msg.z},${msg.yaw},${msg.moving},${msg.alive},${msg.hp}`;
         if (sig !== last || now - lastAt > HEARTBEAT_MS) {
           last = sig;
           lastAt = now;
@@ -69,6 +82,7 @@ export function useMultiplayer(gameId: string | null, me: Account | null) {
 
     return () => {
       window.clearInterval(timer);
+      pvp.hit = () => {};
       void supabase.removeChannel(ch);
       remotes.clear();
       setPlayers([]);

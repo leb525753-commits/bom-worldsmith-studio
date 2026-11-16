@@ -8,6 +8,7 @@ import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from "@/componen
 import { StudioButton } from "@/components/studio/StudioButton";
 import { supabase } from "@/integrations/supabase/client";
 import bomAi from "@/assets/bom-ai.jpg";
+import { freeReply } from "../aiFree";
 import { codeLabel } from "../catalog";
 import { aiMapObjects } from "../sim/aiMap";
 import { useStudio } from "../store";
@@ -87,6 +88,11 @@ export function AiChat({ onClose }: { onClose: () => void }) {
     const content = text.trim();
     if (!content || status === "submitted" || status === "streaming") return;
     const history = [...messages, { id: uid(), role: "user" as const, text: content, tools: [] }];
+    const free = freeReply(content);
+    if (free) {
+      setMessages([...history, { id: uid(), role: "assistant", text: free, tools: [] }]);
+      return;
+    }
     setMessages([...history, { id: uid(), role: "assistant", text: "", tools: [] }]);
     setStatus("submitted");
     const ctrl = new AbortController();

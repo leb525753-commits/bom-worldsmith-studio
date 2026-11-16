@@ -15,6 +15,20 @@
       "when": 1794703283419,
       "tag": "0001_games_visibility_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794801322887,
+      "tag": "0002_game_cover_images",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794801341057,
+      "tag": "0003_game_covers_read",
+      "breakpoints": true
     }
   ]
 }

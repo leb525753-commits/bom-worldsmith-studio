@@ -2,7 +2,8 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronsDown, ChevronsUp, Fl
 import { useRef, useState, type ComponentType, type PointerEvent } from "react";
 import { StudioButton } from "@/components/studio/StudioButton";
 import { input, runtime } from "../runtime";
-import { drinkPotion, dropItem, jump, swing } from "../sim/play";
+import { canSwing, drinkPotion, dropItem, heldSword, jump, playersInReach, swing } from "../sim/play";
+import { pvp, remotes } from "../multiplayer";
 import { useStudio } from "../store";
 import { lockLandscape } from "../orientation";
 
@@ -98,7 +99,13 @@ export function Joystick() {
 }
 
 export function doSwing() {
-  if (runtime.current) swing(runtime.current);
+  const rt = runtime.current;
+  if (!rt) return;
+  const ok = canSwing(rt);
+  const damage = heldSword(rt)?.damage ?? 0;
+  swing(rt);
+  // Other players in a play-together room take the hit on their own device.
+  if (ok) for (const id of playersInReach(rt, [...remotes.values()])) pvp.hit(id, damage);
 }
 
 export function doDrop() {

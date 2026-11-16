@@ -71,7 +71,14 @@ function Games() {
             {games.map((g) => {
               const mine = g.ownerId === me?.id;
               return (
-                <li key={g.id} className="flex flex-col gap-2 rounded-xl border border-border bg-panel p-3">
+                <li key={g.id} className="flex flex-col gap-2 overflow-hidden rounded-xl border border-border bg-panel p-3">
+                  <div className="-mx-3 -mt-3 aspect-video bg-muted">
+                    {g.coverUrl ? (
+                      <img src={g.coverUrl} alt={`Ảnh bìa ${g.name}`} loading="lazy" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="grid h-full place-items-center text-muted-foreground"><Gamepad2 className="h-8 w-8" /></div>
+                    )}
+                  </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{g.name || "Dự án"}</p>
                     <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">

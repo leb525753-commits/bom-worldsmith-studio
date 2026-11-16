@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       games: {
         Row: {
+          cover_url: string | null
           created_at: string
           data: Json
           id: string
@@ -27,6 +28,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cover_url?: string | null
           created_at?: string
           data: Json
           id: string
@@ -38,6 +40,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cover_url?: string | null
           created_at?: string
           data?: Json
           id?: string
