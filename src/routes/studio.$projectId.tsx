@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
 import { StudioButton } from "@/components/studio/StudioButton";
 import { World } from "@/game/scene/World";
+import { useGraphicsDpr } from "@/game/graphics";
 import { runtime } from "@/game/runtime";
 import { useStudio } from "@/game/store";
 import { getAccount } from "@/game/accounts";
@@ -35,6 +36,7 @@ export const Route = createFileRoute("/studio/$projectId")({
 function Studio() {
   const { projectId } = Route.useParams();
   const navigate = useNavigate();
+  const dpr = useGraphicsDpr();
   const project = useStudio((s) => s.project);
   const openProject = useStudio((s) => s.open);
   const rename = useStudio((s) => s.rename);
@@ -105,7 +107,7 @@ function Studio() {
         <main className="relative min-w-0 flex-1 bg-viewport" data-scene-ready={ready || undefined}>
           <Canvas
             shadows
-            dpr={[1, 1.75]}
+            dpr={dpr}
             camera={{ position: [14, 12, 18], fov: 50, near: 0.1, far: 1000 }}
             onCreated={() => requestAnimationFrame(() => setReady(true))}
           >

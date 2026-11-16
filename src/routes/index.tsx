@@ -1,6 +1,7 @@
 import { autoLockOnFirstTap } from "@/game/orientation";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Clock, FolderOpen, Gamepad2, LogIn, LogOut, Plus, Trash2, UserRound } from "lucide-react";
+import { Clock, FolderOpen, Gamepad2, LogIn, LogOut, Plus, Settings, Trash2, UserRound } from "lucide-react";
+import { SettingsDialog } from "@/game/ui/SettingsDialog";
 import { useEffect, useState, type FormEvent } from "react";
 import { StudioButton } from "@/components/studio/StudioButton";
 import splash from "@/assets/splash-world.jpg";
@@ -27,6 +28,7 @@ function Home() {
   const [projects, setProjects] = useState<GameSummary[] | null>(null);
   const [account, setAccount] = useState<Account | null | undefined>(undefined);
   const [showForm, setShowForm] = useState(false);
+  const [settings, setSettings] = useState(false);
   const [name, setName] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
@@ -117,7 +119,11 @@ function Home() {
           <StudioButton variant="play" size="xl" onClick={() => navigate({ to: "/games" })}>
             <Gamepad2 className="h-5 w-5" /> Game
           </StudioButton>
+          <StudioButton size="xl" onClick={() => setSettings(true)}>
+            <Settings className="h-5 w-5" /> Cài đặt
+          </StudioButton>
         </div>
+        {settings && <SettingsDialog onClose={() => setSettings(false)} />}
 
         <section className="w-full animate-float-in [animation-delay:220ms]">
           <h2 className="mb-2 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">

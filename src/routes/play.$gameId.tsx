@@ -8,6 +8,7 @@ import { useMultiplayer } from "@/game/multiplayer";
 import { runtime } from "@/game/runtime";
 import { RemotePlayers } from "@/game/scene/RemotePlayers";
 import { World } from "@/game/scene/World";
+import { useGraphicsDpr } from "@/game/graphics";
 import { getGame } from "@/game/storage";
 import { useStudio } from "@/game/store";
 import { PlayHud, RotateHint } from "@/game/ui/Overlays";
@@ -32,6 +33,7 @@ export const Route = createFileRoute("/play/$gameId")({
 function PlayGame() {
   const { gameId } = Route.useParams();
   const navigate = useNavigate();
+  const dpr = useGraphicsDpr();
   const project = useStudio((s) => s.project);
   const mode = useStudio((s) => s.mode);
   const [me, setMe] = useState<Account | null>(null);
@@ -79,7 +81,7 @@ function PlayGame() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-viewport text-foreground">
-      <Canvas shadows dpr={[1, 1.75]} camera={{ position: [14, 12, 18], fov: 50, near: 0.1, far: 1000 }}>
+      <Canvas shadows dpr={dpr} camera={{ position: [14, 12, 18], fov: 50, near: 0.1, far: 1000 }}>
         <World />
         <RemotePlayers players={players} />
       </Canvas>

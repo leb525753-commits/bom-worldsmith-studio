@@ -16,7 +16,7 @@ export function Modal({ title, subtitle, onClose, children, footer }: {
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-3 backdrop-blur-sm" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-popover shadow-float animate-float-in">
+      <div className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-xl text-left border border-border bg-popover shadow-float animate-float-in">
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold">{title}</h2>

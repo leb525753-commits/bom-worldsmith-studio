@@ -39,4 +39,5 @@ use the editor.
 - Game covers are stored in the private `game-covers` bucket under `<owner uid>/`; `games.cover_url` holds the path and list views get signed URLs (public buckets are blocked in this workspace).
 - Player-vs-player hits are sent as a `hit` broadcast in the game room; the target client applies the damage to its own runtime (`pvp` in `src/game/multiplayer.ts`).
 - Built-in Bờm AI answers that skip the AI call live in `src/game/aiFree.ts`.
+- Graphics quality (Settings on the home screen) is saved in localStorage and applied as Canvas dpr = target rows / window height (`src/game/graphics.ts`, math in `src/game/sim/graphics.ts`).
 - Dev builds expose `window.__studio` (the zustand store) for scripted browser checks.
