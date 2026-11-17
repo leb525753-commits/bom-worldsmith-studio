@@ -1,10 +1,19 @@
 import { BLOCK_COLORS, DEFAULT_HP, DEFAULT_MONSTER_DAMAGE, codeLabel } from "../catalog";
-import type { BlockEffect, GameObject, NpcType, ObjKind } from "../types";
+import type { BlockEffect, GameObject, MoneySource, NpcType, ObjKind, ShopItem } from "../types";
+
+/** Extra touch behaviour that "-chạm vô …" lines add to the part/block above them. */
+export interface TouchOpts {
+  touchMoney?: number;
+  touchTeleport?: boolean;
+}
 
 export type GameCommand =
   | { type: "npc"; npcType: NpcType; hp: number; damage: number }
-  | { type: "block"; colorName: string; color: string; effect?: BlockEffect; value?: number }
-  | { type: "object"; kind: Exclude<ObjKind, "npc" | "block"> };
+  | ({ type: "block"; colorName: string; color: string; effect?: BlockEffect; value?: number } & TouchOpts)
+  | ({ type: "object"; kind: Exclude<ObjKind, "npc" | "block"> } & TouchOpts)
+  | { type: "moneyGui"; rewards: Partial<Record<MoneySource, number>> }
+  | { type: "shop"; items: ShopItem[] }
+  | { type: "removeGui"; gui: "money" | "shop" };
 
 export interface CodeError {
   line: number;
@@ -27,7 +36,7 @@ const OBJECT_ALIASES: Array<[RegExp, Exclude<ObjKind, "npc" | "block">]> = [
   [/^(một )?(đoạn )?đường$/, "road"],
   [/^(một )?(bụi cây|bụi)$/, "bush"],
   [/^(một )?(thanh )?kiếm$/, "sword"],
-  [/^(một )?(part|khối)$/, "part"],
+  [/^(một )?(khối )?(part|khối)$/, "part"],
 ];
 
 const NPC_HEADER = /^-\s*tạo\s+(?:một\s+)?npc(?:\s*-?\s*máu\s*:?\s*\[?\s*(\d+)\s*\]?)?$/;
@@ -37,6 +46,20 @@ const DAMAGE = /^\+\s*\[?\s*(\d+)\s*\]?\s*(?:dame|damage|dmg)$/;
 const BLOCK = /^-\s*tạo\s+(?:một\s+)?block(?:\s*-?\s*màu\s*:?\s*(.*))?$/;
 const FEATURE = /^\+\s*thêm\s+chức\s+năng\s*[=:]?\s*(.+)$/;
 const CREATE = /^-\s*tạo\s+(.+)$/;
+const MONEY_GUI = /^-\s*tạo\s+gui\s+tiền$/;
+const SHOP_GUI = /^-\s*tạo\s+gui\s+shop$/;
+const REMOVE_GUI = /^-\s*xóa\s+gui\s+(tiền|shop)$/;
+const REWARD = /^-\s*(quái vật|dân thường|người chơi)\s*\+\s*\[?\s*(\d+)\s*\]?\s*(?:tiền)?$/;
+const SHOP_LINE = /^-\s*(.+?)\s*[:=]?\s*\[?\s*(\d+)\s*\]?\s*tiền$/;
+const TOUCH = /^[-+]\s*chạm\s*(?:vô|vào)?\s*(.*)$/;
+const SOURCE: Record<string, MoneySource> = { "quái vật": "monster", "dân thường": "civilian", "người chơi": "player" };
+
+/** Shop item names the game knows how to sell. */
+function shopKind(name: string): ShopItem["kind"] | null {
+  if (/^(thanh )?kiếm/.test(name)) return "sword";
+  if (/^(bình )?thuốc/.test(name)) return "potion";
+  return null;
+}
 
 /** Parses the "Code Game" script into spawn commands. */
 export function parseGameCode(src: string): ParseResult {
@@ -44,10 +67,15 @@ export function parseGameCode(src: string): ParseResult {
   const errors: CodeError[] = [];
   let pending: { hp: number; npcType?: NpcType; damage?: number } | null = null;
   let block: Extract<GameCommand, { type: "block" }> | null = null;
+  /** Last "-tạo part" command, so "-chạm vô …" lines can attach to it. */
+  let part: Extract<GameCommand, { type: "object" }> | null = null;
+  let section: Extract<GameCommand, { type: "moneyGui" }> | Extract<GameCommand, { type: "shop" }> | null = null;
 
   const flush = () => {
     if (block) commands.push(block);
     block = null;
+    part = null;
+    section = null;
     if (!pending) return;
     const npcType = pending.npcType ?? "civilian";
     commands.push({
@@ -67,7 +95,48 @@ export function parseGameCode(src: string): ParseResult {
       errors.push({ line: i + 1, text: raw.trim(), message });
     };
 
-    let m = line.match(BLOCK);
+    if (MONEY_GUI.test(line) || SHOP_GUI.test(line)) {
+      flush();
+      section = MONEY_GUI.test(line) ? { type: "moneyGui", rewards: {} } : { type: "shop", items: [] };
+      commands.push(section);
+      return;
+    }
+    let m = line.match(REMOVE_GUI);
+    if (m) {
+      flush();
+      commands.push({ type: "removeGui", gui: m[1] === "shop" ? "shop" : "money" });
+      return;
+    }
+    m = line.match(TOUCH);
+    if (m) {
+      const target = block ?? part;
+      if (!target) return err("Dòng “-chạm vô …” phải nằm ngay dưới “-tạo part” hoặc “-tạo block”");
+      const what = m[1] ?? "";
+      const money = what.match(/\+\s*\[?\s*(\d+)\s*\]?\s*tiền/);
+      const tele = /dịch\s*chuyển/.test(what);
+      if (!money && !tele) return err("Dùng “-chạm vô +100 tiền” hoặc “-chạm vô dịch chuyển về nơi spawn”");
+      if (money) target.touchMoney = parseInt(money[1] ?? "0", 10);
+      if (tele) target.touchTeleport = true;
+      return;
+    }
+    if (section?.type === "moneyGui") {
+      m = line.match(REWARD);
+      if (m) {
+        const src = SOURCE[m[1] ?? ""];
+        if (src) section.rewards[src] = parseInt(m[2] ?? "0", 10);
+        return;
+      }
+    }
+    if (section?.type === "shop" && !CREATE.test(line)) {
+      m = line.match(SHOP_LINE);
+      const name = (m?.[1] ?? "").replace(/[[\]()]/g, "").trim();
+      const kind = shopKind(name);
+      if (!m || !kind) return err("Shop chỉ bán “kiếm” hoặc “thuốc chạy”, ví dụ: -kiếm 100 tiền");
+      section.items.push({ kind, label: name.charAt(0).toUpperCase() + name.slice(1), price: parseInt(m[2] ?? "0", 10) });
+      return;
+    }
+
+    m = line.match(BLOCK);
     if (m) {
       flush();
       const name = (m[1] ?? "trắng").replace(/[[\]{}<>()]/g, "").trim() || "trắng";
@@ -94,6 +163,9 @@ export function parseGameCode(src: string): ParseResult {
       pending = { hp: m[1] ? Math.max(1, parseInt(m[1], 10)) : DEFAULT_HP };
       return;
     }
+    if (section?.type === "moneyGui" && (CIVILIAN.test(line) || MONSTER.test(line) || /^-\s*người chơi$/.test(line))) {
+      return err("Thiếu số tiền, ví dụ: -quái vật +100");
+    }
     if (CIVILIAN.test(line) || MONSTER.test(line)) {
       if (!pending) return err("Thiếu dòng “-tạo một npc-máu …” ở phía trên");
       pending.npcType = CIVILIAN.test(line) ? "civilian" : "monster";
@@ -111,7 +183,9 @@ export function parseGameCode(src: string): ParseResult {
       const what = (m[1] ?? "").trim();
       const hit = OBJECT_ALIASES.find(([re]) => re.test(what));
       if (!hit) return err(`Không biết vật thể “${what}”`);
-      commands.push({ type: "object", kind: hit[1] });
+      const cmd: Extract<GameCommand, { type: "object" }> = { type: "object", kind: hit[1] };
+      commands.push(cmd);
+      if (hit[1] === "part") part = cmd;
       return;
     }
     err("Không hiểu dòng lệnh này");

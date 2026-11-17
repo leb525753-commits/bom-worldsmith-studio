@@ -1,4 +1,5 @@
-import type { BlockEffect, Project } from "../types";
+import { DEFAULT_SWORD_DAMAGE } from "../catalog";
+import type { BlockEffect, MoneySource, Project, ShopItem } from "../types";
 
 export const TUNING = {
   PLAYER_SPEED: 6,
@@ -21,6 +22,8 @@ export const TUNING = {
   STEP_UP: 0.3,
   VANISH_DELAY: 3,
   HURT_COOLDOWN: 1,
+  /** Seconds before the same part can pay "chạm vô +N tiền" again. */
+  TOUCH_COOLDOWN: 1,
 };
 
 export type Role = "player" | "civilian" | "monster";
@@ -80,6 +83,13 @@ export interface BlockState {
   timer: number;
   gone: boolean;
   hurtCd: number;
+  /** Money paid on touch (Code Game "-chạm vô +100 tiền"). */
+  money: number;
+  /** Touching sends the player back to spawn. */
+  teleport: boolean;
+  /** Player was touching last frame (money is paid when a touch starts). */
+  touching: boolean;
+  touchCd: number;
 }
 
 export interface PlayState {
@@ -93,6 +103,12 @@ export interface PlayState {
   swingCd: number;
   obstacles: Box[];
   time: number;
+  money: number;
+  rewards: Partial<Record<MoneySource, number>>;
+  shop: ShopItem[];
+  spawn: { x: number; y: number; z: number };
+  /** Counter for ids of items bought in the shop. */
+  bought: number;
 }
 
 function actor(id: string, role: Role, x: number, z: number, hp: number, damage: number, speed: number): Actor {
@@ -103,7 +119,7 @@ function actor(id: string, role: Role, x: number, z: number, hp: number, damage:
 }
 
 export function createPlayState(project: Project): PlayState {
-  const [px, , pz] = project.player.position;
+  const [px, py, pz] = project.player.position;
   const npcs: Actor[] = [];
   const items: ItemState[] = [];
   const blocks: BlockState[] = [];
@@ -119,13 +135,15 @@ export function createPlayState(project: Project): PlayState {
       items.push({ id: o.id, kind: o.kind, x, z, damage: o.kind === "sword" ? (o.damage ?? 10) : 0, held: false, used: false });
     } else if (o.kind === "house" || o.kind === "house2") {
       obstacles.push({ minX: x - 2 * sx, maxX: x + 2 * sx, minZ: z - 2 * sz, maxZ: z + 2 * sz, base: -99, top: 99 });
-    } else if (o.kind === "part") {
+    } else if (o.kind === "part" && !o.touchMoney && !o.touchTeleport) {
       obstacles.push({ minX: x - sx, maxX: x + sx, minZ: z - sz, maxZ: z + sz, base: y, top: y + sy });
-    } else if (o.kind === "block") {
+    } else if (o.kind === "block" || o.kind === "part") {
+      // Parts with touch rules behave like blocks so the player can touch them.
       blocks.push({
         id: o.id,
         box: { minX: x - sx, maxX: x + sx, minZ: z - sz, maxZ: z + sz, base: y, top: y + sy },
-        effect: o.effect, value: o.effectValue ?? 10, timer: -1, gone: false, hurtCd: 0,
+        effect: o.kind === "block" ? o.effect : undefined, value: o.effectValue ?? 10, timer: -1, gone: false, hurtCd: 0,
+        money: Math.max(0, o.touchMoney ?? 0), teleport: !!o.touchTeleport, touching: false, touchCd: 0,
       });
     }
   }
@@ -133,6 +151,11 @@ export function createPlayState(project: Project): PlayState {
     player: actor("player", "player", px, pz, project.player.hp, 0, TUNING.PLAYER_SPEED),
     npcs, items, blocks, obstacles,
     heldId: null, pickupLock: null, swingT: 0, swingCd: 0, time: 0,
+    money: 0,
+    rewards: { ...(project.economy?.rewards ?? {}) },
+    shop: project.economy?.shop ?? [],
+    spawn: { x: px, y: py, z: pz },
+    bought: 0,
   };
 }
 
@@ -259,14 +282,29 @@ export function stepPlay(s: PlayState, move: { x: number; z: number }, dt: numbe
   // Touch blocks
   for (const b of s.blocks) {
     b.hurtCd = Math.max(0, b.hurtCd - dt);
+    b.touchCd = Math.max(0, b.touchCd - dt);
     if (b.gone) continue;
     if (b.timer >= 0) {
       b.timer -= dt;
       if (b.timer <= 0) b.gone = true;
     }
-    if (!p.alive || !b.effect) continue;
+    if (!p.alive || (!b.effect && !b.money && !b.teleport)) continue;
     const touching = over(p, b.box, TUNING.ACTOR_RADIUS + 0.1) && p.y <= b.box.top + 0.1 && p.y + ACTOR_H >= b.box.base;
+    const started = touching && !b.touching;
+    b.touching = touching;
     if (!touching) continue;
+    if (started && b.money > 0 && b.touchCd <= 0) {
+      b.touchCd = TUNING.TOUCH_COOLDOWN;
+      s.money += b.money;
+    }
+    if (b.teleport) {
+      p.x = s.spawn.x;
+      p.y = s.spawn.y;
+      p.z = s.spawn.z;
+      p.vy = 0;
+      b.touching = false;
+      continue;
+    }
     if (b.effect === "vanish" && b.timer < 0) b.timer = TUNING.VANISH_DELAY;
     if (b.effect === "hurt" && b.hurtCd <= 0) {
       b.hurtCd = TUNING.HURT_COOLDOWN;
@@ -347,6 +385,7 @@ export function swing(s: PlayState): string[] {
     if (Math.hypot(n.x - s.player.x, n.z - s.player.z) <= TUNING.SWORD_REACH) {
       damageActor(n, w.damage);
       hits.push(n.id);
+      if (!n.alive) rewardKill(s, n.role === "monster" ? "monster" : "civilian");
     }
   }
   return hits;
@@ -400,4 +439,28 @@ export function drinkPotion(s: PlayState): boolean {
   s.heldId = null;
   s.player.speed += TUNING.POTION_SPEED_BONUS;
   return true;
+}
+
+/** Pays the money GUI reward for defeating a monster, civilian or another player. */
+export function rewardKill(s: PlayState, source: MoneySource): number {
+  const r = Math.max(0, s.rewards[source] ?? 0);
+  s.money += r;
+  return r;
+}
+
+/** Buys shop item `index`: takes the money and puts the item in the player's hand. */
+export function buyItem(s: PlayState, index: number): "ok" | "poor" | "none" {
+  const it = s.shop[index];
+  if (!it || !s.player.alive) return "none";
+  if (s.money < it.price) return "poor";
+  s.money -= it.price;
+  if (s.heldId) dropItem(s);
+  s.bought += 1;
+  const item: ItemState = {
+    id: `shop:${s.bought}`, kind: it.kind, x: s.player.x, z: s.player.z,
+    damage: it.kind === "sword" ? DEFAULT_SWORD_DAMAGE : 0, held: true, used: false,
+  };
+  s.items.push(item);
+  s.heldId = item.id;
+  return "ok";
 }

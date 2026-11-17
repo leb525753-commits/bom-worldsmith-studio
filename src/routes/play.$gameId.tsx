@@ -11,7 +11,7 @@ import { World } from "@/game/scene/World";
 import { useGraphicsDpr } from "@/game/graphics";
 import { getGame } from "@/game/storage";
 import { useStudio } from "@/game/store";
-import { PlayHud, RotateHint } from "@/game/ui/Overlays";
+import { PlayHud, RotateHint, ShopGui } from "@/game/ui/Overlays";
 import { useKeyboard } from "@/game/ui/useKeyboard";
 import { autoLockOnFirstTap } from "@/game/orientation";
 
@@ -110,6 +110,7 @@ function PlayGame() {
             ))}
           </ul>
         </div>
+        <ShopGui />
       </div>
       <RotateHint />
     </div>

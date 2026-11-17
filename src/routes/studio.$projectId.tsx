@@ -15,7 +15,7 @@ import { getGame } from "@/game/storage";
 import { AiChat } from "@/game/ui/AiChat";
 import { useKeyboard } from "@/game/ui/useKeyboard";
 import { CodeDialog, CodeGameDialog } from "@/game/ui/CodeDialogs";
-import { NavPad, PlayHud, RotateHint } from "@/game/ui/Overlays";
+import { NavPad, PlayHud, RotateHint, ShopGui } from "@/game/ui/Overlays";
 import { ControlPanel, ModelStore } from "@/game/ui/Panels";
 
 export const Route = createFileRoute("/studio/$projectId")({
@@ -122,7 +122,12 @@ function Studio() {
                 <NavPad />
               </>
             ) : (
-              <PlayHud />
+              <>
+                <PlayHud />
+                <div className="absolute right-3 top-3">
+                  <ShopGui />
+                </div>
+              </>
             )}
           </div>
         </main>

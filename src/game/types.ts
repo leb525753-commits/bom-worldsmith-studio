@@ -18,6 +18,28 @@ export interface GameObject {
   effect?: BlockEffect;
   /** HP lost per touch for "hurt" blocks. */
   effectValue?: number;
+  /** Money given each time the player touches this part/block (Code Game "-chạm vô +100 tiền"). */
+  touchMoney?: number;
+  /** Touching sends the player back to the spawn point. */
+  touchTeleport?: boolean;
+}
+
+export type MoneySource = "monster" | "civilian" | "player";
+export type ShopItemKind = "sword" | "potion";
+
+export interface ShopItem {
+  kind: ShopItemKind;
+  /** Name as the creator wrote it, e.g. "Thuốc chạy". */
+  label: string;
+  price: number;
+}
+
+/** Money GUI + shop made with Code Game. */
+export interface Economy {
+  moneyGui: boolean;
+  /** Money earned for defeating each kind of target. */
+  rewards: Partial<Record<MoneySource, number>>;
+  shop: ShopItem[];
 }
 
 export interface PlayerSpawn {
@@ -33,4 +55,5 @@ export interface Project {
   objects: GameObject[];
   player: PlayerSpawn;
   script?: string;
+  economy?: Economy;
 }

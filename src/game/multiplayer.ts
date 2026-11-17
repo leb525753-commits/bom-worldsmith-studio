@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Account } from "./accounts";
 import { runtime } from "./runtime";
-import { hurtPlayer } from "./sim/play";
+import { hurtPlayer, rewardKill } from "./sim/play";
 
 /** Other players in the same game room. Positions live outside React, like the play runtime. */
 export interface Remote {
@@ -44,9 +44,19 @@ export function useMultiplayer(gameId: string | null, me: Account | null) {
       if (isNew) sync();
     });
     ch.on("broadcast", { event: "hit" }, ({ payload }) => {
-      const h = payload as { target?: unknown; damage?: unknown } | undefined;
-      if (!h || h.target !== myId || typeof h.damage !== "number" || !runtime.current) return;
-      hurtPlayer(runtime.current, h.damage);
+      const h = payload as { target?: unknown; damage?: unknown; from?: unknown } | undefined;
+      const rt = runtime.current;
+      if (!h || h.target !== myId || typeof h.damage !== "number" || !rt) return;
+      const wasAlive = rt.player.alive;
+      hurtPlayer(rt, h.damage);
+      // Tell the attacker they defeated us so their money GUI pays the "-người chơi +N" reward.
+      if (wasAlive && !rt.player.alive && typeof h.from === "string") {
+        void ch.send({ type: "broadcast", event: "kill", payload: { target: h.from } });
+      }
+    });
+    ch.on("broadcast", { event: "kill" }, ({ payload }) => {
+      const k = payload as { target?: unknown } | undefined;
+      if (k?.target === myId && runtime.current) rewardKill(runtime.current, "player");
     });
     pvp.hit = (target, damage) => {
       if (joined) void ch.send({ type: "broadcast", event: "hit", payload: { target, damage, from: myId } });

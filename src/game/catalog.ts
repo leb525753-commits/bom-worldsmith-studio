@@ -70,7 +70,7 @@ export function newId(): string {
 export function makeObject(
   kind: ObjKind,
   position: Vec3,
-  opts: { id?: string; npcType?: NpcType; hp?: number; damage?: number; color?: string; effect?: BlockEffect | undefined; effectValue?: number | undefined } = {},
+  opts: { id?: string; npcType?: NpcType; hp?: number; damage?: number; color?: string; effect?: BlockEffect | undefined; effectValue?: number | undefined; touchMoney?: number | undefined; touchTeleport?: boolean | undefined } = {},
 ): GameObject {
   const obj: GameObject = {
     id: opts.id ?? newId(),
@@ -84,6 +84,8 @@ export function makeObject(
     obj.effect = opts.effect;
     if (opts.effect === "hurt") obj.effectValue = opts.effectValue ?? 10;
   }
+  if ((kind === "part" || kind === "block") && opts.touchMoney) obj.touchMoney = opts.touchMoney;
+  if ((kind === "part" || kind === "block") && opts.touchTeleport) obj.touchTeleport = true;
   if (kind === "sword") obj.damage = opts.damage ?? DEFAULT_SWORD_DAMAGE;
   if (kind === "npc") {
     obj.npcType = opts.npcType ?? "civilian";

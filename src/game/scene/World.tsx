@@ -103,10 +103,83 @@ function PlayStepper() {
     const st = useStudio.getState();
     const w = heldItem(rt);
     const h = st.hud;
-    const next = { hp: rt.player.hp, holding: w?.kind ?? null, damage: w?.damage ?? 0, dead: !rt.player.alive, speed: rt.player.speed };
-    if (h.hp !== next.hp || h.holding !== next.holding || h.damage !== next.damage || h.dead !== next.dead || h.speed !== next.speed) st.setHud(next);
+    const next = { hp: rt.player.hp, holding: w?.kind ?? null, damage: w?.damage ?? 0, dead: !rt.player.alive, speed: rt.player.speed, money: rt.money };
+    if (h.hp !== next.hp || h.holding !== next.holding || h.damage !== next.damage || h.dead !== next.dead || h.speed !== next.speed || h.money !== next.money) st.setHud(next);
   });
   return null;
+}
+
+const SPH = new THREE.Spherical();
+const OFF = new THREE.Vector3();
+
+/*
+ * Drag-to-look for touch and mouse. OrbitControls listens to pointer moves on the whole page,
+ * so a finger on the joystick / nav buttons was read as a camera drag and spun the view.
+ * This only follows a pointer that went down on the 3D view itself, and only while it is the single one.
+ */
+function LookControls() {
+  const controls = useThree((s) => s.controls) as unknown as OrbitControlsImpl | null;
+  const camera = useThree((s) => s.camera);
+  const el = useThree((s) => s.gl.domElement);
+  useEffect(() => {
+    if (!controls) return;
+    const down = new Map<number, { x: number; y: number }>();
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      down.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    };
+    const onMove = (e: PointerEvent) => {
+      const last = down.get(e.pointerId);
+      if (!last) return;
+      const dx = e.clientX - last.x;
+      const dy = e.clientY - last.y;
+      last.x = e.clientX;
+      last.y = e.clientY;
+      // Two fingers on the view = zoom/pan (OrbitControls); a gizmo drag disables controls.
+      if (down.size !== 1 || !controls.enabled) return;
+      const h = el.clientHeight || 1;
+      OFF.copy(camera.position).sub(controls.target);
+      SPH.setFromVector3(OFF);
+      SPH.theta -= (2 * Math.PI * dx) / h;
+      SPH.phi = Math.min(controls.maxPolarAngle, Math.max(0.05, SPH.phi - (2 * Math.PI * dy) / h));
+      OFF.setFromSpherical(SPH);
+      camera.position.copy(controls.target).add(OFF);
+      camera.lookAt(controls.target);
+    };
+    const onUp = (e: PointerEvent) => {
+      down.delete(e.pointerId);
+    };
+    el.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      el.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [controls, camera, el]);
+  return null;
+}
+
+/* Swords / potions bought in the shop exist only in the play runtime; render them when dropped. */
+function BoughtItems() {
+  const [items, setItems] = useState<Array<{ id: string; kind: "sword" | "potion" }>>([]);
+  useFrame(() => {
+    const rt = runtime.current;
+    if (!rt || rt.bought === items.length) return;
+    setItems(rt.items.filter((w) => w.id.startsWith("shop:")).map((w) => ({ id: w.id, kind: w.kind })));
+  });
+  return (
+    <>
+      {items.map((it) => (
+        <group key={it.id}>
+          <ItemLive obj={{ id: it.id, kind: it.kind, position: [0, 0, 0], scale: [1, 1, 1], color: it.kind === "potion" ? "#e0457b" : "#c9ced6" }} />
+        </group>
+      ))}
+    </>
+  );
 }
 
 function useSelectable(obj: GameObject) {
@@ -354,6 +427,8 @@ export function World() {
       <SkyAndLights />
       <Baseplate />
       <PlayerView key={`player:${session}`} />
+      <BoughtItems key={`bought:${session}`} />
+      <LookControls />
       {objects.map((o) => (
         <ObjectView key={`${o.id}:${session}`} obj={o} selected={o.id === selectedId} />
       ))}
@@ -363,6 +438,7 @@ export function World() {
         enableDamping
         dampingFactor={0.12}
         enablePan={mode === "edit"}
+        enableRotate={false}
         minDistance={3}
         maxDistance={90}
         maxPolarAngle={Math.PI / 2 - 0.04}

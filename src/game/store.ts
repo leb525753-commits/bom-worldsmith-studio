@@ -4,7 +4,7 @@ import { runtime, viewCenter } from "./runtime";
 import { createPlayState, type ItemKind } from "./sim/play";
 import type { Account } from "./accounts";
 import { saveProject } from "./storage";
-import type { GameObject, ObjKind, Project, Vec3 } from "./types";
+import type { Economy, GameObject, ObjKind, Project, Vec3 } from "./types";
 
 export type Gizmo = "none" | "translate" | "scale";
 
@@ -15,6 +15,7 @@ export interface Hud {
   speed: number;
   damage: number;
   dead: boolean;
+  money: number;
 }
 
 interface StudioState {
@@ -29,6 +30,7 @@ interface StudioState {
   open: (project: Project, isNew: boolean, account: Account) => void;
   rename: (name: string) => void;
   setScript: (script: string) => void;
+  setEconomy: (fn: (e: Economy) => Economy) => void;
   spawn: (kind: ObjKind, opts?: Parameters<typeof makeObject>[2]) => GameObject;
   spawnMany: (objs: GameObject[]) => void;
   update: (id: string, patch: Partial<GameObject>) => void;
@@ -48,7 +50,7 @@ export function spawnPoint(spread = 1.5): Vec3 {
   return [+(viewCenter.x + r()).toFixed(2), 0, +(viewCenter.z + r()).toFixed(2)];
 }
 
-const emptyHud: Hud = { hp: 100, maxHp: 100, holding: null, speed: 6, damage: 0, dead: false };
+const emptyHud: Hud = { hp: 100, maxHp: 100, holding: null, speed: 6, damage: 0, dead: false, money: 0 };
 
 export const useStudio = create<StudioState>((set, get) => {
   const patchProject = (fn: (p: Project) => Project) => {
@@ -71,6 +73,7 @@ export const useStudio = create<StudioState>((set, get) => {
     },
     rename: (name) => patchProject((p) => ({ ...p, name })),
     setScript: (script) => patchProject((p) => ({ ...p, script })),
+    setEconomy: (fn) => patchProject((p) => ({ ...p, economy: fn(p.economy ?? { moneyGui: false, rewards: {}, shop: [] }) })),
     spawn: (kind, opts) => {
       const obj = makeObject(kind, spawnPoint(kind === "road" ? 0 : 1.5), opts);
       patchProject((p) => ({ ...p, objects: [...p.objects, obj] }));

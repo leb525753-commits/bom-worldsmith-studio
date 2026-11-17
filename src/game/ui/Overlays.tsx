@@ -1,8 +1,8 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronsDown, ChevronsUp, FlaskConical, Footprints, Hand, Heart, MoveUp, Smartphone, Swords } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronsDown, ChevronsUp, Coins, FlaskConical, Footprints, Hand, Heart, MoveUp, ShoppingBag, Smartphone, Swords, X } from "lucide-react";
 import { useRef, useState, type ComponentType, type PointerEvent } from "react";
 import { StudioButton } from "@/components/studio/StudioButton";
 import { input, runtime } from "../runtime";
-import { canSwing, drinkPotion, dropItem, heldSword, jump, playersInReach, swing } from "../sim/play";
+import { buyItem, canSwing, drinkPotion, dropItem, heldItem, heldSword, jump, playersInReach, swing } from "../sim/play";
 import { pvp, remotes } from "../multiplayer";
 import { useStudio } from "../store";
 import { lockLandscape } from "../orientation";
@@ -121,8 +121,80 @@ export function doDrink() {
   if (rt && drinkPotion(rt)) useStudio.getState().setHud({ holding: null, speed: rt.player.speed });
 }
 
+/** Money GUI made with Code Game "-tạo gui tiền" (always top-left while playing). */
+function MoneyGui() {
+  const money = useStudio((s) => s.hud.money);
+  return (
+    <div className="flex items-center gap-1.5 rounded-lg border border-border bg-overlay px-2.5 py-1.5 text-sm font-bold tabular-nums backdrop-blur-md">
+      <Coins className="h-4 w-4 text-warning" /> {money.toLocaleString("vi-VN")} <span className="text-[11px] font-medium text-muted-foreground">tiền</span>
+    </div>
+  );
+}
+
+function doBuy(index: number): "ok" | "poor" | "none" {
+  const rt = runtime.current;
+  if (!rt) return "none";
+  const r = buyItem(rt, index);
+  if (r === "ok") {
+    const w = heldItem(rt);
+    useStudio.getState().setHud({ money: rt.money, holding: w?.kind ?? null, damage: w?.damage ?? 0 });
+  }
+  return r;
+}
+
+/** Shop GUI made with Code Game "-tạo gui shop" (top-right while playing). */
+export function ShopGui({ className = "" }: { className?: string }) {
+  const shop = useStudio((s) => s.project?.economy?.shop);
+  const mode = useStudio((s) => s.mode);
+  const money = useStudio((s) => s.hud.money);
+  const dead = useStudio((s) => s.hud.dead);
+  const [open, setOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 900);
+  const [poor, setPoor] = useState<number | null>(null);
+  if (mode !== "play" || !shop?.length) return null;
+  if (!open) {
+    return (
+      <StudioButton size="sm" className={`pointer-events-auto ${className}`} onClick={() => setOpen(true)}>
+        <ShoppingBag className="h-4 w-4" /> Shop
+      </StudioButton>
+    );
+  }
+  return (
+    <div className={`pointer-events-auto w-48 rounded-lg border border-border bg-overlay p-2 text-xs backdrop-blur-md ${className}`}>
+      <div className="mb-1.5 flex items-center justify-between">
+        <p className="flex items-center gap-1.5 font-bold"><ShoppingBag className="h-3.5 w-3.5 text-primary" /> Shop</p>
+        <button type="button" aria-label="Thu gọn shop" onClick={() => setOpen(false)} className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <ul className="space-y-1">
+        {shop.map((it, i) => (
+          <li key={i} className="flex items-center gap-2">
+            {it.kind === "sword" ? <Swords className="h-3.5 w-3.5 shrink-0" /> : <FlaskConical className="h-3.5 w-3.5 shrink-0" />}
+            <span className="min-w-0 flex-1 truncate">{it.label}</span>
+            <StudioButton
+              size="sm"
+              variant={money >= it.price ? "primary" : "ghost"}
+              disabled={dead}
+              className="h-7 px-2 text-[11px]"
+              onClick={() => {
+                const r = doBuy(i);
+                setPoor(r === "poor" ? i : null);
+              }}
+            >
+              {it.price} tiền
+            </StudioButton>
+          </li>
+        ))}
+      </ul>
+      {poor !== null && <p className="mt-1.5 text-destructive">Không đủ tiền!</p>}
+    </div>
+  );
+}
+
 export function PlayHud() {
   const hud = useStudio((s) => s.hud);
+  const eco = useStudio((s) => s.project?.economy);
+  const showMoney = !!eco && (eco.moneyGui || eco.shop.length > 0);
   const pct = Math.max(0, Math.min(100, (hud.hp / hud.maxHp) * 100));
   return (
     <>
@@ -144,9 +216,12 @@ export function PlayHud() {
           {hud.holding === "potion" && <> · Đang cầm bình thuốc</>}
         </p>
       </div>
-      <p className="pointer-events-none absolute left-3 top-3 hidden rounded-md bg-overlay px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-md xl:block">
-        WASD / joystick để đi · Space nhảy · J chém · E uống · Q thả
-      </p>
+      <div className="pointer-events-none absolute left-3 top-3 flex flex-col items-start gap-2">
+        {showMoney && <MoneyGui />}
+        <p className="hidden rounded-md bg-overlay px-2 py-1 text-[11px] text-muted-foreground backdrop-blur-md xl:block">
+          WASD / joystick để đi · Space nhảy · J chém · E uống · Q thả
+        </p>
+      </div>
       <Joystick />
       {!hud.dead && (
         <div className="pointer-events-auto absolute bottom-5 right-4 flex items-end gap-3">
