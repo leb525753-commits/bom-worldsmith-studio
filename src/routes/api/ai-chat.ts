@@ -58,7 +58,6 @@ export const Route = createFileRoute("/api/ai-chat")({
         const apiKey = process.env["GEMINI_API_KEY"];
         if (!apiKey) return json(500, "Chưa cấu hình GEMINI_API_KEY");
 
-        // Chuyển đổi hội thoại sang định dạng Gemini
         const contents = messages.map((m) => ({
           role: m.role === "assistant" ? "model" : "user",
           parts: [{ text: m.content }],
@@ -100,19 +99,16 @@ export const Route = createFileRoute("/api/ai-chat")({
         ];
 
         try {
-          const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite
-            :generateContent?key=${apiKey}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                systemInstruction: { parts: [{ text: `${INSTRUCTIONS}\n\nMap hiện tại:\n${scene || "(trống)"}` }] },
-                contents,
-                tools,
-              }),
-            }
-          );
+          const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=" + apiKey;
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: `${INSTRUCTIONS}\n\nMap hiện tại:\n${scene || "(trống)"}` }] },
+              contents,
+              tools,
+            }),
+          });
 
           if (!res.ok) {
             const errData = await res.text();
@@ -123,7 +119,6 @@ export const Route = createFileRoute("/api/ai-chat")({
           const data = (await res.json()) as any;
           const candidate = data.candidates?.[0]?.content?.parts ?? [];
 
-          // Tạo luồng SSE tương thích giao diện Bờm AI
           const encoder = new TextEncoder();
           const stream = new ReadableStream({
             start(controller) {
@@ -178,3 +173,4 @@ export const Route = createFileRoute("/api/ai-chat")({
     },
   },
 });
+  
