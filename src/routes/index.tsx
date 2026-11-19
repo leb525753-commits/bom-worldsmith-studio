@@ -14,7 +14,7 @@ export const Route = createFileRoute("/")({
     meta: [
       { title: "Bờm Studio Update 1.1 — Làm game 3D trên web" },
       { name: "description", content: "Bờm Studio: dựng thế giới 3D, thêm NPC, kiếm và chơi thử ngay trên trình duyệt." },
-      { property: "og:title", content: "Bờm Studio Update 1.0" },
+      { property: "og:title", content: "Bờm Studio Update 1.1" },
       { property: "og:description", content: "Dựng thế giới 3D, thêm NPC, kiếm và chơi thử ngay trên trình duyệt." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -75,7 +75,7 @@ function Home() {
             Bờm <span className="text-primary">Studio</span>
           </span>
           <span className="mt-2 inline-block rounded-full border border-primary/60 bg-overlay px-3 py-1 text-[clamp(0.75rem,1.6vw,1rem)] font-semibold text-primary backdrop-blur-md">
-            Update 1.0
+            Update 1.1
           </span>
         </h1>
 
