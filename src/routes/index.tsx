@@ -12,7 +12,7 @@ import { deleteProject, importLocalProjects, listGames, type GameSummary } from 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Bờm Studio Update 1.0 — Làm game 3D trên web" },
+      { title: "Bờm Studio Update 1.1 — Làm game 3D trên web" },
       { name: "description", content: "Bờm Studio: dựng thế giới 3D, thêm NPC, kiếm và chơi thử ngay trên trình duyệt." },
       { property: "og:title", content: "Bờm Studio Update 1.0" },
       { property: "og:description", content: "Dựng thế giới 3D, thêm NPC, kiếm và chơi thử ngay trên trình duyệt." },
