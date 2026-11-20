@@ -55,11 +55,17 @@ export const Route = createFileRoute("/api/ai-chat")({
         if (!parsed.success) return json(400, "Tin nhắn không hợp lệ");
         const { messages, scene } = parsed.data;
 
-        // Ưu tiên dùng Key riêng do người chơi gửi lên, nếu không có thì dùng Key dự phòng của bạn
+        // Nhận key riêng của người chơi gửi lên hoặc key mặc định
         const customKey = request.headers.get("x-gemini-key")?.trim();
-        const apiKey = customKey || process.env["GEMINI_API_KEY"];
+        const apiKey = (customKey || process.env["GEMINI_API_KEY"] || "").trim();
+
         if (!apiKey) {
-          return json(500, "Chưa cấu hình API Key. Bấm vào biểu tượng Chìa khoá 🔑 ở góc chat để nhập Key Gemini của bạn.");
+          return json(500, "Chưa có API Key. Hãy bấm nút Chìa khoá 🔑 ở góc chat để nhập Key Gemini.");
+        }
+
+        // Bắt lỗi nếu người dùng vô tình copy dính dấu ba chấm hiển thị rút gọn trên Google AI Studio
+        if (apiKey.includes("...") || apiKey.includes("…")) {
+          return json(502, "Key bị thiếu (dính dấu ba chấm). Hãy bấm nút Copy 📋 ở cạnh key trên trang Google để lấy đủ 53 ký tự!");
         }
 
         const contents = messages.map((m) => ({
@@ -103,10 +109,13 @@ export const Route = createFileRoute("/api/ai-chat")({
         ];
 
         try {
-          const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=" + apiKey;
+          const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=" + encodeURIComponent(apiKey);
           const res = await fetch(endpoint, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
             body: JSON.stringify({
               systemInstruction: { parts: [{ text: `${INSTRUCTIONS}\n\nMap hiện tại:\n${scene || "(trống)"}` }] },
               contents,
@@ -116,12 +125,12 @@ export const Route = createFileRoute("/api/ai-chat")({
 
           if (!res.ok) {
             const errData = await res.text();
-            console.error("Gemini API error:", errData);
+            console.error("Gemini API error:", res.status, errData);
             if (res.status === 429) {
               return json(502, "Key này đã hết lượt tạm thời (vượt giới hạn phút/ngày của Google). Vui lòng thử lại sau ít phút hoặc nhập Key khác!");
             }
-            if (res.status === 400 || res.status === 403) {
-              return json(502, "API Key không hợp lệ hoặc bị từ chối. Hãy kiểm tra lại Key Gemini trong nút Chìa khoá 🔑.");
+            if (res.status === 400 || res.status === 401 || res.status === 403) {
+              return json(502, "API Key không hợp lệ hoặc bị từ chối. Hãy bấm nút Copy 📋 cạnh key trên Google AI Studio để lấy đúng mã 53 ký tự.");
             }
             return json(502, "Lỗi từ Gemini API, hãy kiểm tra lại key");
           }
@@ -183,4 +192,4 @@ export const Route = createFileRoute("/api/ai-chat")({
     },
   },
 });
-  
+                                            
