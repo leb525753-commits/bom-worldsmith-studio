@@ -1,4 +1,4 @@
-import { Hammer, RotateCcw, X } from "lucide-react";
+import { Hammer, Key, RotateCcw, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
@@ -33,7 +33,6 @@ const SUGGESTIONS = ["Xây một ngôi làng có đường và cây táo", "Làm
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-/** Short scene summary so the AI knows what is already on the map. */
 function sceneSummary(): string {
   const objs = useStudio.getState().project?.objects ?? [];
   if (objs.length === 0) return "";
@@ -42,7 +41,6 @@ function sceneSummary(): string {
   return `${objs.length} vật thể: ${[...counts].map(([k, n]) => `${n} ${k}`).join(", ")}`;
 }
 
-/** What the model sees from earlier turns (tool calls are summarised as text). */
 const historyText = (m: ChatMsg) =>
   [m.text, ...m.tools.filter((t) => t.output).map((t) => `(Đã xây map: ${t.output!.added} vật thể)`)].filter(Boolean).join("\n") || "(trống)";
 
@@ -51,6 +49,14 @@ export function AiChat({ onClose }: { onClose: () => void }) {
   const [status, setStatus] = useState<Status>("ready");
   const abortRef = useRef<AbortController | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+
+  // Quản lý API Key riêng của người chơi trong máy (localStorage)
+  const [showKeyDialog, setShowKeyDialog] = useState(false);
+  const [savedKey, setSavedKey] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("bom_custom_gemini_key") || "";
+  });
+  const [apiKeyInput, setApiKeyInput] = useState(savedKey);
 
   const focusInput = useCallback(() => boxRef.current?.querySelector("textarea")?.focus(), []);
   useEffect(() => {
@@ -65,6 +71,18 @@ export function AiChat({ onClose }: { onClose: () => void }) {
 
   const patchLast = (fn: (m: ChatMsg) => ChatMsg) =>
     setMessages((list) => (list.length ? [...list.slice(0, -1), fn(list[list.length - 1]!)] : list));
+
+  const handleSaveKey = () => {
+    const trimmed = apiKeyInput.trim();
+    if (trimmed) {
+      localStorage.setItem("bom_custom_gemini_key", trimmed);
+      setSavedKey(trimmed);
+    } else {
+      localStorage.removeItem("bom_custom_gemini_key");
+      setSavedKey("");
+    }
+    setShowKeyDialog(false);
+  };
 
   const applyBuild = (callId: string, rawArgs: string) => {
     let args: unknown;
@@ -99,10 +117,19 @@ export function AiChat({ onClose }: { onClose: () => void }) {
     abortRef.current = ctrl;
     try {
       const { data } = await supabase.auth.getSession();
+      const customKey = localStorage.getItem("bom_custom_gemini_key")?.trim() || "";
+      const headers: Record<string, string> = {
+        "content-type": "application/json",
+        authorization: `Bearer ${data.session?.access_token ?? ""}`,
+      };
+      if (customKey) {
+        headers["x-gemini-key"] = customKey;
+      }
+
       const res = await fetch("/api/ai-chat", {
         method: "POST",
         signal: ctrl.signal,
-        headers: { "content-type": "application/json", authorization: `Bearer ${data.session?.access_token ?? ""}` },
+        headers,
         body: JSON.stringify({ messages: history.map((m) => ({ role: m.role, content: historyText(m) })), scene: sceneSummary() }),
       });
       if (!res.ok || !res.body) {
@@ -176,6 +203,15 @@ export function AiChat({ onClose }: { onClose: () => void }) {
           <h2 className="text-sm font-semibold">Bờm AI</h2>
           <p className="truncate text-[11px] text-muted-foreground">Hỏi gì cũng được · Nhờ xây map từ model có sẵn</p>
         </div>
+        <StudioButton
+          size="icon"
+          variant={savedKey ? "primary" : "ghost"}
+          aria-label="Cài đặt API Key Gemini"
+          title={savedKey ? "Đang dùng Key Gemini cá nhân" : "Nhập Key Gemini riêng"}
+          onClick={() => setShowKeyDialog((v) => !v)}
+        >
+          <Key className="h-4 w-4" />
+        </StudioButton>
         <StudioButton size="icon" variant="ghost" aria-label="Trò chuyện mới" disabled={busy || messages.length === 0} onClick={() => setMessages([])}>
           <RotateCcw className="h-4 w-4" />
         </StudioButton>
@@ -183,6 +219,53 @@ export function AiChat({ onClose }: { onClose: () => void }) {
           <X className="h-4 w-4" />
         </StudioButton>
       </header>
+
+      {/* Bảng nhập Key cá nhân */}
+      {showKeyDialog && (
+        <div className="border-b border-border bg-secondary/60 p-3 text-xs space-y-2">
+          <div className="flex items-center justify-between font-semibold">
+            <span className="flex items-center gap-1.5">
+              <Key className="h-3.5 w-3.5 text-primary" /> Key Gemini cá nhân
+            </span>
+            {savedKey ? (
+              <span className="text-[10px] text-primary font-medium">● Đang bật key riêng</span>
+            ) : (
+              <span className="text-[10px] text-muted-foreground">Chưa nhập</span>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Key lưu trực tiếp trên máy của bạn, không bị nghẽn khi đông người dùng chung. Lấy miễn phí tại:{" "}
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary underline">
+              Google AI Studio
+            </a>
+          </p>
+          <div className="flex gap-1.5">
+            <input
+              type="password"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              placeholder="Dán AIzaSy... vào đây"
+              className="flex-1 rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <StudioButton size="sm" onClick={handleSaveKey}>
+              Lưu
+            </StudioButton>
+          </div>
+          {savedKey && (
+            <button
+              type="button"
+              onClick={() => {
+                setApiKeyInput("");
+                localStorage.removeItem("bom_custom_gemini_key");
+                setSavedKey("");
+              }}
+              className="text-[11px] text-destructive hover:underline"
+            >
+              Xoá key riêng (quay về key mặc định)
+            </button>
+          )}
+        </div>
+      )}
 
       <Conversation className="min-h-0 flex-1">
         <ConversationContent className="gap-4 p-3">
@@ -261,4 +344,5 @@ export function AiChat({ onClose }: { onClose: () => void }) {
       </div>
     </aside>
   );
-}
+                                          }
+        
