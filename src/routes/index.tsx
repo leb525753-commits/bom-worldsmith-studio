@@ -4,7 +4,7 @@ import { Clock, FolderOpen, Gamepad2, LogIn, LogOut, Plus, Settings, Trash2, Use
 import { SettingsDialog } from "@/game/ui/SettingsDialog";
 import { useEffect, useState, type FormEvent } from "react";
 import { StudioButton } from "@/components/studio/StudioButton";
-import splash from "@/assets/splash-world.jpg";
+const splash = "/__l5e/assets-v1/b70ad7e7-10af-4738-a7c1-3d177dca1cd0/splash-gojo.jpg";
 import { getAccount, login, logout, type Account } from "@/game/accounts";
 import { newId } from "@/game/catalog";
 import { deleteProject, importLocalProjects, listGames, type GameSummary } from "@/game/storage";
@@ -173,4 +173,4 @@ function Home() {
       </div>
     </div>
   );
-}
+                                                                                                                      }
