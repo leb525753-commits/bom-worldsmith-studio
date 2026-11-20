@@ -150,11 +150,63 @@ export function SwordGroundModel() {
   );
 }
 
+/* Texture studs vuông dập nổi kiểu Roblox cổ điển */
+let cachedStudTexture: THREE.CanvasTexture | null = null;
+function getStudTexture() {
+  if (typeof document === "undefined") return null;
+  if (cachedStudTexture) return cachedStudTexture;
+
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d");
+  if (!g) return null;
+
+  // Nền xám trung tính (giữ nguyên màu gốc của part khi pha trộn)
+  g.fillStyle = "#888888";
+  g.fillRect(0, 0, 128, 128);
+
+  const step = 32;
+  const size = 20;
+  for (let x = 0; x < 128; x += step) {
+    for (let y = 0; y < 128; y += step) {
+      const px = x + (step - size) / 2;
+      const py = y + (step - size) / 2;
+
+      // Viền bóng đổ góc dưới & phải (tạo chiều sâu)
+      g.fillStyle = "#333333";
+      g.fillRect(px + 2, py + 2, size, size);
+
+      // Viền sáng dập nổi góc trên & trái (tạo ánh sáng phản xạ)
+      g.fillStyle = "#e0e0e0";
+      g.fillRect(px, py, size, size);
+
+      // Mặt phẳng đỉnh của nút stud vuông
+      g.fillStyle = "#9a9a9a";
+      g.fillRect(px + 2, py + 2, size - 4, size - 4);
+    }
+  }
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 2);
+  t.anisotropy = 4;
+  cachedStudTexture = t;
+  return t;
+}
+
 export function PartModel({ color }: { color: string }) {
+  const tex = useMemo(() => getStudTexture(), []);
   return (
     <mesh castShadow receiveShadow position={[0, 0.5, 0]}>
       <boxGeometry args={[2, 1, 2]} />
-      <meshStandardMaterial color={color} roughness={0.6} />
+      <meshStandardMaterial
+        color={color}
+        map={tex ?? undefined}
+        bumpMap={tex ?? undefined}
+        bumpScale={0.035}
+        roughness={0.55}
+      />
     </mesh>
   );
 }
@@ -179,7 +231,6 @@ export function animateLimbs(l: Limbs, t: number, moving: boolean, swing01 = 0) 
   if (l.rightLeg) l.rightLeg.rotation.x = ease(l.rightLeg.rotation.x, -a);
   if (l.leftArm) l.leftArm.rotation.x = ease(l.leftArm.rotation.x, -a);
   if (l.rightArm) {
-    // swing01 goes 1 -> 0 during a slash: raise then chop down.
     const slash = swing01 > 0 ? -2.6 * Math.sin(swing01 * Math.PI) : 0;
     l.rightArm.rotation.x = swing01 > 0 ? slash : ease(l.rightArm.rotation.x, a);
   }
@@ -300,7 +351,6 @@ export function Baseplate() {
     const g = c.getContext("2d")!;
     g.fillStyle = "#6c7077";
     g.fillRect(0, 0, 256, 256);
-    // subtle noise so the surface does not read as a flat placeholder
     for (let i = 0; i < 900; i++) {
       const v = 100 + Math.floor(Math.random() * 18);
       g.fillStyle = `rgba(${v},${v + 3},${v + 8},0.35)`;
@@ -395,4 +445,5 @@ export function PotionModel({ color = "#e0457b" }: { color?: string }) {
       </mesh>
     </group>
   );
-}
+        }
+      
