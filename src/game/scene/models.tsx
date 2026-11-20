@@ -118,25 +118,25 @@ export function BushModel({ color }: { color: string }) {
 export function SwordBlade() {
   return (
     <group>
-      <mesh castShadow position={[0, 0.12, 0]}>
-        <cylinderGeometry args={[0.045, 0.055, 0.35, 8]} />
-        <meshStandardMaterial color="#51361a" roughness={0.8} />
+      <mesh castShadow position={[0, -0.22, 0]}>
+        <sphereGeometry args={[0.07, 8, 6]} />
+        <meshStandardMaterial color="#d4a72c" metalness={0.7} roughness={0.3} />
       </mesh>
-      <mesh castShadow position={[0, -0.07, 0]}>
-        <sphereGeometry args={[0.075, 10, 8]} />
-        <meshStandardMaterial color="#d89f2a" metalness={0.7} roughness={0.3} />
+      <mesh castShadow>
+        <cylinderGeometry args={[0.05, 0.05, 0.38, 8]} />
+        <meshStandardMaterial color="#5a3a22" roughness={0.8} />
       </mesh>
-      <mesh castShadow position={[0, 0.32, 0]}>
-        <boxGeometry args={[0.38, 0.06, 0.1]} />
-        <meshStandardMaterial color="#d89f2a" metalness={0.7} roughness={0.3} />
+      <mesh castShadow position={[0, 0.22, 0]}>
+        <boxGeometry args={[0.5, 0.07, 0.11]} />
+        <meshStandardMaterial color="#d4a72c" metalness={0.7} roughness={0.3} />
       </mesh>
-      <mesh castShadow position={[0, 0.95, 0]}>
-        <boxGeometry args={[0.13, 1.2, 0.03]} />
-        <meshStandardMaterial color="#eef2f7" metalness={0.85} roughness={0.2} />
+      <mesh castShadow position={[0, 0.86, 0]}>
+        <boxGeometry args={[0.11, 1.2, 0.03]} />
+        <meshStandardMaterial color="#dfe4ea" metalness={0.85} roughness={0.18} />
       </mesh>
-      <mesh castShadow position={[0, 1.62, 0]} rotation={[0, 0, Math.PI / 4]}>
-        <boxGeometry args={[0.09, 0.09, 0.03]} />
-        <meshStandardMaterial color="#eef2f7" metalness={0.85} roughness={0.2} />
+      <mesh castShadow position={[0, 1.5, 0]} rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[0.078, 0.12, 4]} />
+        <meshStandardMaterial color="#dfe4ea" metalness={0.85} roughness={0.18} />
       </mesh>
     </group>
   );
@@ -152,7 +152,7 @@ export function SwordGroundModel() {
 
 /* 1 nút stud vuông dập nổi chuẩn Roblox: 1 ô texture = đúng 1 stud */
 let cachedStudTexture: THREE.CanvasTexture | null = null;
-function getStudTexture() {
+function getStudTexture(): THREE.CanvasTexture | null {
   if (typeof document === "undefined") return null;
   if (cachedStudTexture) return cachedStudTexture;
 
@@ -206,7 +206,7 @@ export function PartModel({ color }: { color: string }) {
     const sx = Math.max(0.01, ws.x);
     const sy = Math.max(0.01, ws.y);
     const sz = Math.max(0.01, ws.z);
-    const key = `${sx.toFixed(2)}_${sy.toFixed(2)}_${sz.toFixed(2)}`;
+    const key = sx.toFixed(2) + "_" + sy.toFixed(2) + "_" + sz.toFixed(2);
     if (key === lastKey.current) return;
     lastKey.current = key;
 
@@ -215,21 +215,23 @@ export function PartModel({ color }: { color: string }) {
     const h = 1 * sy;
     const d = 2 * sz;
 
-    const uv = geometry.attributes.uv as THREE.BufferAttribute | undefined;
+    const uv = geometry.attributes["uv"] as THREE.BufferAttribute | undefined;
     if (!uv) return;
 
     // 6 mặt của khối hộp: lặp studs đúng theo tỷ lệ 1 stud = 1 mét
     const dims: [number, number][] = [
       [d, h], // +X (phải)
       [d, h], // -X (trái)
-      [w, d], // +Y (đỉnh - mặt có studs nhiều nhất)
+      [w, d], // +Y (đỉnh)
       [w, d], // -Y (đáy)
       [w, h], // +Z (trước)
       [w, h], // -Z (sau)
     ];
 
     for (let f = 0; f < 6; f++) {
-      const [fw, fh] = dims[f];
+      const dim = dims[f];
+      if (!dim) continue;
+      const [fw, fh] = dim;
       const base = f * 4;
       uv.setXY(base + 0, 0, fh);
       uv.setXY(base + 1, fw, fh);
@@ -243,8 +245,8 @@ export function PartModel({ color }: { color: string }) {
     <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow position={[0, 0.5, 0]}>
       <meshStandardMaterial
         color={color}
-        map={tex ?? undefined}
-        bumpMap={tex ?? undefined}
+        map={tex || null}
+        bumpMap={tex || null}
         bumpScale={0.035}
         roughness={0.55}
       />
@@ -261,110 +263,84 @@ export interface Limbs {
   rightLeg: THREE.Group | null;
 }
 
-export function useLimbs(): [RefObject<Limbs>, (part: keyof Limbs) => (g: THREE.Group | null) => void] {
-  const limbs = useRef<Limbs>({ leftArm: null, rightArm: null, leftLeg: null, rightLeg: null });
-  const bind = (part: keyof Limbs) => (g: THREE.Group | null) => {
-    limbs.current[part] = g;
-  };
-  return [limbs, bind];
+export function useLimbs() {
+  return useRef<Limbs>({ leftArm: null, rightArm: null, leftLeg: null, rightLeg: null });
 }
 
-export function animateLimbs(limbs: Limbs | null, speed: number, t: number) {
-  if (!limbs) return;
-  const swinging = speed > 0.05;
-  const swing = swinging ? Math.sin(t * 9) * 0.55 : 0;
-  if (limbs.leftArm) limbs.leftArm.rotation.x = -swing;
-  if (limbs.rightArm) limbs.rightArm.rotation.x = swing;
-  if (limbs.leftLeg) limbs.leftLeg.rotation.x = swing;
-  if (limbs.rightLeg) limbs.rightLeg.rotation.x = -swing;
+export function animateLimbs(l: Limbs, t: number, moving: boolean, swing01 = 0) {
+  const a = moving ? Math.sin(t * 10) * 0.7 : 0;
+  const ease = (cur: number, want: number) => cur + (want - cur) * 0.3;
+  if (l.leftLeg) l.leftLeg.rotation.x = ease(l.leftLeg.rotation.x, a);
+  if (l.rightLeg) l.rightLeg.rotation.x = ease(l.rightLeg.rotation.x, -a);
+  if (l.leftArm) l.leftArm.rotation.x = ease(l.leftArm.rotation.x, -a);
+  if (l.rightArm) {
+    const slash = swing01 > 0 ? -2.6 * Math.sin(swing01 * Math.PI) : 0;
+    l.rightArm.rotation.x = swing01 > 0 ? slash : ease(l.rightArm.rotation.x, a);
+  }
 }
 
-export function Avatar({
-  limbs,
-  skin = "#f5cd30",
-  shirt = "#1f6fd1",
-  pants = "#4caf50",
-  monster = false,
-  rightHand = null,
-}: {
-  limbs?: RefObject<Limbs>;
-  skin?: string;
-  shirt?: string;
-  pants?: string;
+interface AvatarProps {
+  limbs: RefObject<Limbs>;
+  skin: string;
+  shirt: string;
+  pants: string;
   monster?: boolean;
   rightHand?: ReactNode;
-}) {
+}
+
+function Limb({ color, ...props }: { color: string } & ThreeElements["group"]) {
   return (
-    <group position={[0, 0, 0]}>
-      <mesh castShadow receiveShadow position={[0, 1.45, 0]}>
-        <boxGeometry args={[1, 1, 0.5]} />
+    <group {...props}>
+      <mesh castShadow position={[0, -0.4, 0]}>
+        <boxGeometry args={[0.4, 0.8, 0.4]} />
+        <meshStandardMaterial color={color} roughness={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
+export function Avatar({ limbs, skin, shirt, pants, monster, rightHand }: AvatarProps) {
+  const set = (k: keyof Limbs) => (g: THREE.Group | null) => {
+    if (limbs.current) limbs.current[k] = g;
+  };
+  return (
+    <group>
+      <Limb ref={set("leftLeg")} color={pants} position={[-0.2, 0.8, 0]} />
+      <Limb ref={set("rightLeg")} color={pants} position={[0.2, 0.8, 0]} />
+      <mesh castShadow position={[0, 1.2, 0]}>
+        <boxGeometry args={[0.8, 0.8, 0.4]} />
         <meshStandardMaterial color={shirt} roughness={0.7} />
       </mesh>
-      <mesh castShadow receiveShadow position={[0, 2.22, 0]}>
-        <boxGeometry args={[0.7, 0.55, 0.55]} />
+      <Limb ref={set("leftArm")} color={skin} position={[-0.6, 1.6, 0]} />
+      <group ref={set("rightArm")} position={[0.6, 1.6, 0]}>
+        <mesh castShadow position={[0, -0.4, 0]}>
+          <boxGeometry args={[0.4, 0.8, 0.4]} />
+          <meshStandardMaterial color={skin} roughness={0.7} />
+        </mesh>
+        {rightHand && (
+          <group position={[0, -0.78, 0.08]} rotation={[Math.PI / 2, 0, 0]}>
+            {rightHand}
+          </group>
+        )}
+      </group>
+      <mesh castShadow position={[0, 1.88, 0]}>
+        <cylinderGeometry args={[0.3, 0.3, 0.55, 16]} />
         <meshStandardMaterial color={skin} roughness={0.6} />
       </mesh>
-      <mesh position={[-0.14, 2.25, 0.28]}>
-        <boxGeometry args={[0.07, 0.07, 0.02]} />
-        <meshBasicMaterial color={monster ? "#ffff44" : "#111111"} />
+      {[-0.1, 0.1].map((x) => (
+        <mesh key={x} position={[x, 1.95, 0.295]}>
+          <boxGeometry args={[0.06, monster ? 0.06 : 0.11, 0.02]} />
+          <meshStandardMaterial
+            color={monster ? "#ffd23a" : "#111111"}
+            emissive={monster ? "#ffb000" : "#000000"}
+            emissiveIntensity={monster ? 1.4 : 0}
+          />
+        </mesh>
+      ))}
+      <mesh position={[0, 1.8, 0.295]}>
+        <boxGeometry args={[monster ? 0.24 : 0.16, 0.035, 0.02]} />
+        <meshStandardMaterial color="#111111" />
       </mesh>
-      <mesh position={[0.14, 2.25, 0.28]}>
-        <boxGeometry args={[0.07, 0.07, 0.02]} />
-        <meshBasicMaterial color={monster ? "#ffff44" : "#111111"} />
-      </mesh>
-      <mesh position={[0, 2.08, 0.28]}>
-        <boxGeometry args={[0.22, 0.04, 0.02]} />
-        <meshBasicMaterial color={monster ? "#220000" : "#111111"} />
-      </mesh>
-
-      <group
-        ref={(g) => {
-          if (limbs) limbs.current.leftArm = g;
-        }}
-        position={[-0.72, 1.85, 0]}
-      >
-        <mesh castShadow receiveShadow position={[0, -0.4, 0]}>
-          <boxGeometry args={[0.42, 0.95, 0.45]} />
-          <meshStandardMaterial color={shirt} roughness={0.7} />
-        </mesh>
-      </group>
-
-      <group
-        ref={(g) => {
-          if (limbs) limbs.current.rightArm = g;
-        }}
-        position={[0.72, 1.85, 0]}
-      >
-        <mesh castShadow receiveShadow position={[0, -0.4, 0]}>
-          <boxGeometry args={[0.42, 0.95, 0.45]} />
-          <meshStandardMaterial color={shirt} roughness={0.7} />
-        </mesh>
-        {rightHand && <group position={[0, -0.85, 0.25]}>{rightHand}</group>}
-      </group>
-
-      <group
-        ref={(g) => {
-          if (limbs) limbs.current.leftLeg = g;
-        }}
-        position={[-0.26, 0.95, 0]}
-      >
-        <mesh castShadow receiveShadow position={[0, -0.45, 0]}>
-          <boxGeometry args={[0.45, 1, 0.48]} />
-          <meshStandardMaterial color={pants} roughness={0.75} />
-        </mesh>
-      </group>
-
-      <group
-        ref={(g) => {
-          if (limbs) limbs.current.rightLeg = g;
-        }}
-        position={[0.26, 0.95, 0]}
-      >
-        <mesh castShadow receiveShadow position={[0, -0.45, 0]}>
-          <boxGeometry args={[0.45, 1, 0.48]} />
-          <meshStandardMaterial color={pants} roughness={0.75} />
-        </mesh>
-      </group>
       {monster &&
         [-0.17, 0.17].map((x) => (
           <mesh key={x} castShadow position={[x, 2.28, 0]} rotation={[0, 0, x > 0 ? -0.35 : 0.35]}>
@@ -420,7 +396,7 @@ export function Baseplate() {
     g.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 900; i++) {
       const v = 100 + Math.floor(Math.random() * 18);
-      g.fillStyle = `rgba(${v},${v + 3},${v + 8},0.35)`;
+      g.fillStyle = "rgba(" + v + "," + (v + 3) + "," + (v + 8) + ",0.35)";
       g.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
     }
     g.strokeStyle = "#53575d";
@@ -469,7 +445,7 @@ export function House2Model({ color }: { color: string }) {
       </mesh>
       {[1.55, 4].flatMap((y) =>
         [-1.25, 1.25].map((x) => (
-          <mesh key={`${x}:${y}`} position={[x, y, 2.01]}>
+          <mesh key={x + ":" + y} position={[x, y, 2.01]}>
             <boxGeometry args={[0.75, 0.75, 0.06]} />
             <meshStandardMaterial {...GLASS} />
           </mesh>
@@ -481,7 +457,7 @@ export function House2Model({ color }: { color: string }) {
       </mesh>
       {[1.55, 4].flatMap((y) =>
         [-2.01, 2.01].map((x) => (
-          <mesh key={`s${x}:${y}`} position={[x, y, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <mesh key={"s" + x + ":" + y} position={[x, y, 0]} rotation={[0, Math.PI / 2, 0]}>
             <boxGeometry args={[0.9, 0.75, 0.06]} />
             <meshStandardMaterial {...GLASS} />
           </mesh>
@@ -512,5 +488,5 @@ export function PotionModel({ color = "#e0457b" }: { color?: string }) {
       </mesh>
     </group>
   );
-    }
-      
+                 }
+  
