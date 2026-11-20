@@ -55,8 +55,12 @@ export const Route = createFileRoute("/api/ai-chat")({
         if (!parsed.success) return json(400, "Tin nhắn không hợp lệ");
         const { messages, scene } = parsed.data;
 
-        const apiKey = process.env["GEMINI_API_KEY"];
-        if (!apiKey) return json(500, "Chưa cấu hình GEMINI_API_KEY");
+        // Ưu tiên dùng Key riêng do người chơi gửi lên, nếu không có thì dùng Key dự phòng của bạn
+        const customKey = request.headers.get("x-gemini-key")?.trim();
+        const apiKey = customKey || process.env["GEMINI_API_KEY"];
+        if (!apiKey) {
+          return json(500, "Chưa cấu hình API Key. Bấm vào biểu tượng Chìa khoá 🔑 ở góc chat để nhập Key Gemini của bạn.");
+        }
 
         const contents = messages.map((m) => ({
           role: m.role === "assistant" ? "model" : "user",
@@ -113,6 +117,12 @@ export const Route = createFileRoute("/api/ai-chat")({
           if (!res.ok) {
             const errData = await res.text();
             console.error("Gemini API error:", errData);
+            if (res.status === 429) {
+              return json(502, "Key này đã hết lượt tạm thời (vượt giới hạn phút/ngày của Google). Vui lòng thử lại sau ít phút hoặc nhập Key khác!");
+            }
+            if (res.status === 400 || res.status === 403) {
+              return json(502, "API Key không hợp lệ hoặc bị từ chối. Hãy kiểm tra lại Key Gemini trong nút Chìa khoá 🔑.");
+            }
             return json(502, "Lỗi từ Gemini API, hãy kiểm tra lại key");
           }
 
