@@ -55,7 +55,6 @@ export const Route = createFileRoute("/api/ai-chat")({
         if (!parsed.success) return json(400, "Tin nhắn không hợp lệ");
         const { messages, scene } = parsed.data;
 
-        // Nhận key riêng của người chơi gửi lên hoặc key mặc định
         const customKey = request.headers.get("x-gemini-key")?.trim();
         const apiKey = (customKey || process.env["GEMINI_API_KEY"] || "").trim();
 
@@ -63,7 +62,6 @@ export const Route = createFileRoute("/api/ai-chat")({
           return json(500, "Chưa có API Key. Hãy bấm nút Chìa khoá 🔑 ở góc chat để nhập Key Gemini.");
         }
 
-        // Bắt lỗi nếu người dùng vô tình copy dính dấu ba chấm hiển thị rút gọn trên Google AI Studio
         if (apiKey.includes("...") || apiKey.includes("…")) {
           return json(502, "Key bị thiếu (dính dấu ba chấm). Hãy bấm nút Copy 📋 ở cạnh key trên trang Google để lấy đủ 53 ký tự!");
         }
@@ -109,7 +107,7 @@ export const Route = createFileRoute("/api/ai-chat")({
         ];
 
         try {
-          const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=" + encodeURIComponent(apiKey);
+          const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=" + encodeURIComponent(apiKey);
           const res = await fetch(endpoint, {
             method: "POST",
             headers: {
@@ -160,13 +158,9 @@ export const Route = createFileRoute("/api/ai-chat")({
                   controller.enqueue(
                     encoder.encode(
                       `data: ${JSON.stringify({
-                        type: "response.output_item.done",
-                        item: {
-                          type: "function_call",
-                          id: callId,
-                          name: part.functionCall.name,
-                          arguments: JSON.stringify(part.functionCall.args ?? {}),
-                        },
+                        type: "response.function_call_arguments.done",
+                        call_id: callId,
+                        arguments: JSON.stringify(part.functionCall.args || {}),
                       })}\n\n`
                     )
                   );
@@ -185,11 +179,11 @@ export const Route = createFileRoute("/api/ai-chat")({
             },
           });
         } catch (err) {
-          console.error("Lỗi gọi Gemini:", err);
-          return json(502, "Không thể kết nối đến Gemini");
+          console.error("Gemini request failed:", err);
+          return json(500, "Không thể kết nối đến máy chủ Gemini");
         }
       },
     },
   },
 });
-                                            
+                        
