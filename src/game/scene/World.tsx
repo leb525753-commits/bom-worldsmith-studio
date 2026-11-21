@@ -3,12 +3,10 @@ import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
-import { KIND_HEIGHT } from "../catalog";
 import { input, runtime, viewCenter } from "../runtime";
 import { heldItem, stepPlay, TUNING, type Actor, type BlockState, type ItemState } from "../sim/play";
 import { useStudio } from "../store";
 import type { GameObject } from "../types";
-import { ObjectToolbar } from "../ui/ObjectToolbar";
 import {
   animateLimbs, Avatar, Baseplate, BushModel, House2Model, HouseModel, HpBar, PartModel, PotionModel, RoadModel,
   SwordBlade, SwordGroundModel, TreeModel, useLimbs,
@@ -204,7 +202,6 @@ function useSelectable(obj: GameObject) {
 function ObjectView({ obj, selected }: { obj: GameObject; selected: boolean }) {
   const ref = useRef<THREE.Group>(null);
   const handlers = useSelectable(obj);
-  const mode = useStudio((s) => s.mode);
   useHelper(selected ? (ref as React.RefObject<THREE.Object3D>) : false, THREE.BoxHelper, "#38b6ff");
   return (
     <group
@@ -226,7 +223,6 @@ function ObjectView({ obj, selected }: { obj: GameObject; selected: boolean }) {
       {obj.kind === "block" && <BlockLive obj={obj} />}
       {(obj.kind === "sword" || obj.kind === "potion") && <ItemLive obj={obj} />}
       {obj.kind === "npc" && <NpcLive obj={obj} groupRef={ref} />}
-      {selected && mode === "edit" && <ObjectToolbar obj={obj} y={KIND_HEIGHT[obj.kind] + 0.3} />}
     </group>
   );
 }
@@ -446,3 +442,4 @@ export function World() {
     </>
   );
 }
+  
